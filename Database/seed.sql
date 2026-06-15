@@ -1,6 +1,4 @@
--- ── Sample seed data for local development ──────────────────────────────────
 USE studyos;
-
 INSERT INTO subjects (subject_name, semester, branch, university) VALUES
   ('Data Structures and Algorithms', 3, 'CSE', 'SPPU'),
   ('Database Management Systems',    3, 'CSE', 'SPPU'),

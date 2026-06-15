@@ -1,31 +1,36 @@
-# StudyOS — Database Layer
+# StudyOS Database Layer
 
-## MySQL (relational data)
+## Quick Start
 
 ```bash
-# Create database and tables
+# 1. MySQL
 mysql -u root -p < schema.sql
-
-# Load sample seed data
 mysql -u root -p studyos < seed.sql
-```
 
-## Qdrant (vector store)
-
-Start Qdrant with Docker:
-```bash
+# 2. Qdrant (Docker)
 docker run -p 6333:6333 qdrant/qdrant
-```
-
-Then create collections:
-```bash
 python qdrant_setup.py
 ```
 
-## Collections
+## Schema Overview
 
-| Collection      | Purpose                              |
-|-----------------|--------------------------------------|
-| `book_chunks`   | Textbook section embeddings          |
-| `notes_chunks`  | Generated notes embeddings           |
-| `pyq_chunks`    | Previous year question embeddings    |
+| Table          | Purpose                              |
+|----------------|--------------------------------------|
+| users          | Clerk-authenticated students         |
+| subjects       | Subject catalog                      |
+| syllabi        | Uploaded syllabus PDFs               |
+| topics         | Parsed units and subtopics           |
+| books          | Uploaded reference textbooks         |
+| notes          | AI-generated notes                   |
+| quizzes        | MCQ/viva/interview question sets     |
+| progress       | Per-user topic completion + scores   |
+| chat_sessions  | AI tutor conversation sessions       |
+| chat_messages  | Individual tutor messages            |
+
+## Qdrant Collections
+
+| Collection    | Stores                               |
+|---------------|--------------------------------------|
+| book_chunks   | Textbook section embeddings          |
+| notes_chunks  | Generated notes embeddings           |
+| pyq_chunks    | Previous year question embeddings    |

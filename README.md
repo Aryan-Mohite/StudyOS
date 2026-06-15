@@ -1,56 +1,82 @@
-# StudyOS
+# StudyOS v2
 
-> Syllabus-first AI learning platform for Indian engineering students.
+> Syllabus-first AI learning platform — Next.js 15 + FastAPI + LangGraph
 
 ```
 StudyOS/
-├── Frontend/     Vite + React 19 landing page
-├── Backend/      FastAPI (Python) REST API
-└── Database/     MySQL schema + Qdrant vector store setup
+├── Frontend/     Next.js 15 · TypeScript · Tailwind · ShadCN · Framer Motion · Clerk
+├── Backend/      FastAPI · LangGraph · Celery · Multi-model LLM routing
+└── Database/     MySQL schema · Qdrant vector store · Redis cache
 ```
 
 ---
 
-## Quick start
+## Run Order
 
-### Frontend
+```
+MySQL → Qdrant → Redis → Backend (API) → Backend (Celery) → Frontend
+```
+
+---
+
+## Frontend
+
 ```bash
 cd Frontend
-npm install        # installs lucide-react, react, react-dom, vite
-npm run dev        # http://localhost:3000
+npm install
+cp .env.example .env.local      # fill in Clerk keys
+npm run dev                      # http://localhost:3000
 ```
 
-### Backend
+---
+
+## Backend
+
 ```bash
 cd Backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env          # fill in your keys
-uvicorn main:app --reload     # http://localhost:8000
+cp .env.example .env             # fill in all keys
+
+# Terminal 1 — FastAPI
+uvicorn app.main:app --reload    # http://localhost:8000
+                                 # Swagger: http://localhost:8000/docs
+
+# Terminal 2 — Celery worker
+celery -A app.tasks.celery_app worker -Q pdf,embeddings --loglevel=info
 ```
 
-### Database
+---
+
+## Database
+
 ```bash
 # MySQL
 mysql -u root -p < Database/schema.sql
 mysql -u root -p studyos < Database/seed.sql
 
-# Qdrant (Docker)
+# Qdrant
 docker run -p 6333:6333 qdrant/qdrant
 python Database/qdrant_setup.py
+
+# Redis
+docker run -p 6379:6379 redis:alpine
 ```
 
 ---
 
-## Bugs fixed in this version
+## Tech Stack
 
-| # | File | Issue |
-|---|------|-------|
-| 1 | `Frontend/package.json` | `lucide-react` was missing from dependencies — caused runtime crash |
-| 2 | `Frontend/src/index.css` | `#root { width: 1126px; border-inline }` boxed the full-width layout |
-| 3 | `Frontend/src/index.css` | Global `h1/h2 { font-weight: 500 }` fought component inline `700` weights |
-| 4 | `Frontend/src/App.css` | Entire file was Vite starter boilerplate — dead code, never imported |
-| 5 | `Frontend/index.html` | `<title>studyos</title>` was lowercase |
-| 6 | `Frontend/src/index.css` | `@media prefers-color-scheme:dark` flipped backgrounds against the hard-coded light theme |
-| 7 | `Frontend/src/index.css` | `font: 18px/145%` root font-size broke spacing assumptions |
-| 8 | `Frontend/vite.config.js` | Added `/api` proxy to Backend — dev requests forwarded to FastAPI |
+| Layer      | Tech                                         |
+|------------|----------------------------------------------|
+| Frontend   | Next.js 15, TypeScript, Tailwind, ShadCN, Framer Motion |
+| Auth       | Clerk (Google, GitHub, Email OTP)            |
+| Backend    | FastAPI, Pydantic v2, async SQLAlchemy       |
+| AI Agents  | LangGraph multi-agent graph                  |
+| LLMs       | GPT-4o (notes) · Claude (analysis) · Gemini (chat) |
+| Vector DB  | Qdrant                                       |
+| Main DB    | MySQL                                        |
+| Cache      | Redis                                        |
+| Jobs       | Celery + Redis                               |
+| Storage    | Cloudflare R2                                |
