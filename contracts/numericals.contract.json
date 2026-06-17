@@ -1,0 +1,89 @@
+{
+  "$schema": "StudyOS/contracts/numericals",
+  "description": "Output of the Solved Numericals pipeline. Triggered when user requests worked examples for a topic.",
+  "trigger": {
+    "input": {
+      "topic_id": "string (UUID from syllabus)",
+      "topic_name": "string",
+      "subject": "string",
+      "count": "number (default 5, max 10)"
+    }
+  },
+  "contract": {
+    "numerical_set_id": "string (UUID)",
+    "topic_id": "string (UUID)",
+    "topic": "string",
+    "subject": "string",
+    "generated_at": "ISO 8601 datetime string",
+    "problems": [
+      {
+        "id": "number (1-indexed)",
+        "question": "string — full problem statement",
+        "given": {
+          "key (e.g. 'Mass, m')": "value with unit as string (e.g. '5 kg')"
+        },
+        "find": "string — what the problem asks to calculate",
+        "steps": [
+          {
+            "step_number": "number (1-indexed)",
+            "explanation": "string — what this step does and why",
+            "expression": "string in LaTeX | null"
+          }
+        ],
+        "answer": "string — final numerical answer with unit",
+        "unit": "string | null",
+        "difficulty": "easy | medium | hard",
+        "concept_tested": "string — the specific principle this problem tests"
+      }
+    ]
+  },
+  "example": {
+    "numerical_set_id": "ns-001",
+    "topic_id": "t-042",
+    "topic": "Fourier's Law of Heat Conduction",
+    "subject": "Heat Transfer",
+    "generated_at": "2024-06-01T11:30:00Z",
+    "problems": [
+      {
+        "id": 1,
+        "question": "A 0.5 m thick brick wall (k = 0.7 W/m·K) has inner surface temperature of 300°C and outer surface at 30°C. Calculate the heat flux through the wall.",
+        "given": {
+          "Thickness (L)": "0.5 m",
+          "Thermal conductivity (k)": "0.7 W/m·K",
+          "Inner surface temperature (T₁)": "300°C",
+          "Outer surface temperature (T₂)": "30°C"
+        },
+        "find": "Heat flux (q) in W/m²",
+        "steps": [
+          {
+            "step_number": 1,
+            "explanation": "Apply Fourier's Law for 1D steady-state conduction. Heat flux q = -k(dT/dx). For a plane wall, dT/dx = ΔT/L.",
+            "expression": "q = -k\\frac{\\Delta T}{L} = -k\\frac{T_2 - T_1}{L}"
+          },
+          {
+            "step_number": 2,
+            "explanation": "Substitute the given values. Note: heat flows from hot to cold, so the magnitude will be positive.",
+            "expression": "q = 0.7 \\times \\frac{300 - 30}{0.5}"
+          },
+          {
+            "step_number": 3,
+            "explanation": "Calculate the result.",
+            "expression": "q = 0.7 \\times 540 = 378 \\text{ W/m}^2"
+          }
+        ],
+        "answer": "378 W/m²",
+        "unit": "W/m²",
+        "difficulty": "easy",
+        "concept_tested": "Fourier's Law — heat flux through a plane wall"
+      }
+    ]
+  },
+  "validation_rules": [
+    "problems array must have at least 3 items",
+    "difficulty distribution should include at least 1 easy, 1 medium, 1 hard",
+    "every problem must have at least 2 steps",
+    "given object must have at least 1 key-value pair",
+    "answer must include the unit in the string OR unit field must be non-null",
+    "expression must be valid LaTeX or null (never empty string)"
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "StudyOS/contracts/notes",
+  "description": "Output of the Notes Generator pipeline. Triggered when user selects a topic from the syllabus.",
+  "trigger": {
+    "input": {
+      "topic_id": "string (UUID from syllabus)",
+      "topic_name": "string",
+      "subject": "string",
+      "unit_title": "string",
+      "syllabus_context": ["adjacent topic names for LLM context"]
+    }
+  },
+  "contract": {
+    "note_id": "string (UUID)",
+    "topic_id": "string (UUID — links back to syllabus topic)",
+    "topic": "string",
+    "subject": "string",
+    "generated_at": "ISO 8601 datetime string",
+    "sections": [
+      {
+        "heading": "string",
+        "content": "string (markdown allowed — paragraphs, bold, inline code)",
+        "key_points": ["string — concise bullet-point takeaways"],
+        "formula": "string in LaTeX notation | null"
+      }
+    ],
+    "summary": "string — 2-3 sentence recap of the entire topic",
+    "related_topics": ["string — topic names from the same syllabus"]
+  },
+  "example": {
+    "note_id": "n-001",
+    "topic_id": "t-042",
+    "topic": "Fourier's Law of Heat Conduction",
+    "subject": "Heat Transfer",
+    "generated_at": "2024-06-01T11:00:00Z",
+    "sections": [
+      {
+        "heading": "Introduction",
+        "content": "Fourier's Law is the fundamental relationship governing **heat conduction** in solids. It states that the rate of heat transfer through a material is proportional to the negative gradient of temperature and the area through which heat flows.",
+        "key_points": [
+          "Heat flows from high temperature to low temperature regions",
+          "Rate of conduction depends on material's thermal conductivity (k)",
+          "Applicable to steady-state 1D problems"
+        ],
+        "formula": "Q = -kA\\frac{dT}{dx}"
+      },
+      {
+        "heading": "Thermal Conductivity",
+        "content": "Thermal conductivity `k` is a material property measured in W/m·K. Metals have high k values (copper ~400 W/m·K), while insulators have low values (glass wool ~0.04 W/m·K).",
+        "key_points": [
+          "k is temperature-dependent in real materials",
+          "For most problems assume k is constant",
+          "Higher k → better heat conductor"
+        ],
+        "formula": null
+      }
+    ],
+    "summary": "Fourier's Law defines heat conduction rate as proportional to temperature gradient and cross-sectional area. Thermal conductivity k is the key material property. This law forms the basis for all steady-state conduction problems.",
+    "related_topics": [
+      "Newton's Law of Cooling",
+      "Thermal Resistance",
+      "Biot Number"
+    ]
+  },
+  "validation_rules": [
+    "sections array must have at least 2 items",
+    "every section must have heading and content",
+    "key_points must have 2–5 items per section",
+    "formula must be valid LaTeX or null (never empty string)",
+    "related_topics must reference real topic names from the syllabus",
+    "summary must not exceed 3 sentences"
+  ]
+}

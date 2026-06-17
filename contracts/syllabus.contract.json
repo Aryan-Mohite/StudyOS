@@ -1,0 +1,75 @@
+{
+  "$schema": "StudyOS/contracts/syllabus",
+  "description": "Output of the PDF syllabus parser. This is the root data structure — every other feature is scoped to topics within this tree.",
+  "example": {
+    "syllabus_id": "uuid-string",
+    "university": "University of Pune",
+    "program": "B.E. Mechanical Engineering",
+    "semester": 5,
+    "uploaded_at": "2024-06-01T10:00:00Z",
+    "subjects": [
+      {
+        "subject_id": "uuid-string",
+        "name": "Heat Transfer",
+        "code": "ME501",
+        "credits": 4,
+        "units": [
+          {
+            "unit_number": 1,
+            "title": "Conduction",
+            "topics": [
+              {
+                "topic_id": "uuid-string",
+                "name": "Fourier's Law of Heat Conduction",
+                "subtopics": [
+                  "Thermal conductivity",
+                  "Temperature gradient",
+                  "1D steady-state conduction"
+                ],
+                "has_numericals": true,
+                "difficulty_hint": "medium"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "contract": {
+    "syllabus_id": "string (UUID)",
+    "university": "string | null",
+    "program": "string | null",
+    "semester": "number | null",
+    "uploaded_at": "ISO 8601 datetime string",
+    "subjects": [
+      {
+        "subject_id": "string (UUID)",
+        "name": "string",
+        "code": "string | null",
+        "credits": "number | null",
+        "units": [
+          {
+            "unit_number": "number",
+            "title": "string",
+            "topics": [
+              {
+                "topic_id": "string (UUID)",
+                "name": "string",
+                "subtopics": ["string"],
+                "has_numericals": "boolean",
+                "difficulty_hint": "easy | medium | hard | null"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "validation_rules": [
+    "subjects array must have at least 1 item",
+    "every subject must have at least 1 unit",
+    "every unit must have at least 1 topic",
+    "topic_id values must be unique across the entire syllabus",
+    "subject_id values must be unique"
+  ]
+}

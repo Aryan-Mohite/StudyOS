@@ -1,33 +1,42 @@
-"""
-StudyOS — FastAPI Backend
-Entry point: uvicorn main:app --reload
-"""
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import syllabus, notes, chat
+from config import settings
+from database import init_db
+from routers import notes, upload
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialise DB on startup."""
+    await init_db()
+    yield
+
 
 app = FastAPI(
     title="StudyOS API",
-    description="Syllabus-first AI learning platform backend",
-    version="0.1.0",
+    version="0.2.0",
+    description="Phase 2 — Notes + Syllabus Parser (SQLite, Claude direct calls)",
+    lifespan=lifespan,
 )
 
-# ── CORS ────────────────────────────────────────────────────────────────────
+# ── CORS ─────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],   # Vite dev server
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ── Routers ─────────────────────────────────────────────────────────────────
-app.include_router(syllabus.router, prefix="/syllabus", tags=["Syllabus"])
-app.include_router(notes.router,    prefix="/notes",    tags=["Notes"])
-app.include_router(chat.router,     prefix="/chat",     tags=["AI Tutor"])
+# ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(upload.router, prefix="/api")
+app.include_router(notes.router,  prefix="/api")
 
 
-@app.get("/health")
+# ── Health ────────────────────────────────────────────────────────────────────
+@app.get("/health", tags=["meta"])
 def health():
-    return {"status": "ok", "service": "StudyOS API"}
+    return {"status": "ok", "version": app.version}

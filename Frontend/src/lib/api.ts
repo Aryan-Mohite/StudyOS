@@ -1,37 +1,100 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+/**
+ * StudyOS API client — Phase 2
+ *
+ * These functions call the real FastAPI backend.
+ * Set NEXT_PUBLIC_API_URL in .env.local to point at the backend.
+ * Set NEXT_PUBLIC_USE_REAL_API=true to activate real calls.
+ *
+ * When USE_REAL_API is false (or unset), components fall back to mock-api.ts.
+ */
+
+import type { Syllabus, Note } from "@/types";
+
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+class APIError extends Error {
+  constructor(
+    public status: number,
+    public detail: string,
+  ) {
+    super(`API ${status}: ${detail}`);
+    this.name = "APIError";
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = init?.body instanceof FormData;
-  const headers = isFormData
-    ? { ...init?.headers }
-    : { "Content-Type": "application/json", ...init?.headers };
+  const headers: Record<string, string> = isFormData
+    ? {}
+    : { "Content-Type": "application/json" };
 
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers,
-  });
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  const res = await fetch(`${BASE}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? detail;
+    } catch {
+      detail = await res.text().catch(() => detail);
+    }
+    throw new APIError(res.status, detail);
+  }
+
   return res.json() as Promise<T>;
 }
 
-export const api = {
-  uploadSyllabus: (file: File, subjectName: string) => {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("subject_name", subjectName);
-    return request<{ syllabus_id: number; units: unknown[] }>("/syllabus/upload", {
-      method: "POST", body: form,
-    });
-  },
-  getTopics: (id: number) => request<{ topics: unknown[] }>(`/syllabus/${id}/topics`),
-  generateNotes: (topicId: number, noteType: "long" | "short" | "revision") =>
-    request<{ content: string }>("/notes/generate", {
-      method: "POST",
-      body: JSON.stringify({ topic_id: topicId, note_type: noteType }),
-    }),
-  chat: (syllabusId: number, messages: { role: string; content: string }[]) =>
-    request<{ reply: string; sources: string[] }>("/chat/", {
-      method: "POST",
-      body: JSON.stringify({ syllabus_id: syllabusId, messages }),
-    }),
-};
+// ─── Upload ───────────────────────────────────────────────────────────────────
+
+export async function uploadSyllabus(
+  file: File,
+  userId = "dev-user-01",
+): Promise<Syllabus> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("user_id", userId);
+  return request<Syllabus>("/api/upload", { method: "POST", body: form });
+}
+
+export async function getLatestSyllabus(
+  userId = "dev-user-01",
+): Promise<Syllabus> {
+  return request<Syllabus>(`/api/upload/latest?user_id=${userId}`);
+}
+
+// ─── Notes ────────────────────────────────────────────────────────────────────
+
+export interface GenerateNotesInput {
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  unit_title: string;
+  syllabus_context: string[];
+  syllabus_id?: string;
+  force_regenerate?: boolean;
+}
+
+export async function generateNotes(input: GenerateNotesInput): Promise<Note & { _cached: boolean }> {
+  return request<Note & { _cached: boolean }>("/api/notes/generate", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getNotes(topicId: string): Promise<Note> {
+  return request<Note>(`/api/notes/${topicId}`);
+}
+
+export async function deleteNotes(topicId: string): Promise<void> {
+  await request<void>(`/api/notes/${topicId}`, { method: "DELETE" });
+}
+
+// ─── Health ───────────────────────────────────────────────────────────────────
+
+export async function checkHealth(): Promise<{ status: string; version: string }> {
+  return request("/health");
+}
+
+export { APIError };

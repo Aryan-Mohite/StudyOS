@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
 import { Brain, ArrowRight } from "lucide-react";
-import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 
@@ -27,29 +26,28 @@ export function Navbar() {
         {/* Links */}
         <div className="hidden items-center gap-1 md:flex">
           {["Features", "Agents", "Pricing"].map((l) => (
-            <Link key={l} href={`#${l.toLowerCase()}`}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-brand-50 hover:text-brand-600">
+            <Link
+              key={l}
+              href={`#${l.toLowerCase()}`}
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-brand-50 hover:text-brand-600"
+            >
               {l}
             </Link>
           ))}
         </div>
 
-        {/* Auth */}
+        {/* Auth — Phase 1: hardcoded nav; Clerk re-added in Phase 4 */}
         <div className="flex items-center gap-2">
-          <SignedOut>
-            <SignInButton mode="modal">
-              <Button variant="outline" size="sm">Sign in</Button>
-            </SignInButton>
-            <SignInButton mode="modal">
-              <Button size="sm">Get started <ArrowRight size={13} /></Button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <Link href="/dashboard">
-              <Button size="sm" variant="outline">Dashboard</Button>
-            </Link>
-            <UserButton />
-          </SignedIn>
+          <Link href="/dashboard">
+            <Button variant="outline" size="sm">
+              Sign in
+            </Button>
+          </Link>
+          <Link href="/upload">
+            <Button size="sm">
+              Get started <ArrowRight size={13} />
+            </Button>
+          </Link>
         </div>
       </div>
     </motion.nav>
