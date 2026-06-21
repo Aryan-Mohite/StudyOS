@@ -8,7 +8,7 @@
  * When USE_REAL_API is false (or unset), components fall back to mock-api.ts.
  */
 
-import type { Syllabus, Note } from "@/types";
+import type { Syllabus, Note, MCQSet } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -89,6 +89,34 @@ export async function getNotes(topicId: string): Promise<Note> {
 
 export async function deleteNotes(topicId: string): Promise<void> {
   await request<void>(`/api/notes/${topicId}`, { method: "DELETE" });
+}
+
+// ─── MCQ ───────────────────────────────────────────────────────────────────────
+
+export interface GenerateMCQInput {
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  count?: number;
+  difficulty?: "easy" | "medium" | "hard" | "mixed";
+  syllabus_context?: string[];
+  syllabus_id?: string;
+  force_regenerate?: boolean;
+}
+
+export async function generateMCQ(input: GenerateMCQInput): Promise<MCQSet & { _cached: boolean }> {
+  return request<MCQSet & { _cached: boolean }>("/api/mcq/generate", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getMCQ(topicId: string): Promise<MCQSet> {
+  return request<MCQSet>(`/api/mcq/${topicId}`);
+}
+
+export async function deleteMCQ(topicId: string): Promise<void> {
+  await request<void>(`/api/mcq/${topicId}`, { method: "DELETE" });
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────

@@ -37,9 +37,9 @@ Before writing a single component, verify:
 - [ ] All UI states for the feature are defined in `ui-states.md`
 - [ ] Component accepts the typed contract shape as props, not raw `any`
 
-## Phase 2 Checklist
+## Before Wiring Any Real API Endpoint
 
-Before wiring a real API endpoint:
+Applies every time a feature moves from mock to real (Notes in Phase 2, MCQ in Phase 3, and so on):
 
 - [ ] LLM prompt has been tested on 10+ real examples
 - [ ] Output consistently matches the contract (validate with `zod` schema)

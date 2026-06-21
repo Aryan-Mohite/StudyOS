@@ -113,7 +113,12 @@ export default function StudyPage() {
             />
           )}
           {activeTab === "mcq" && (
-            <MCQQuiz topicId={topicId} topicName={topic.name} />
+            <MCQQuiz
+              topicId={topicId}
+              topicName={topic.name}
+              subject={topic.subject}
+              syllabusContext={syllabusContext}
+            />
           )}
         </div>
       </main>

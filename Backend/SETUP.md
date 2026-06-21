@@ -1,8 +1,8 @@
-# StudyOS Backend — Phase 2 Setup
+# StudyOS Backend — Phase 3 Setup (Notes + MCQ)
 
 ## What's here
 
-Lean FastAPI backend with only what Phase 2 needs:
+Lean FastAPI backend, now covering Notes (Phase 2) and MCQ (Phase 3):
 
 | Endpoint | What it does |
 |---|---|
@@ -11,6 +11,9 @@ Lean FastAPI backend with only what Phase 2 needs:
 | `POST /api/notes/generate` | Generate structured notes for a topic (cached after first generation) |
 | `GET  /api/notes/{topic_id}` | Fetch cached notes without LLM call |
 | `DELETE /api/notes/{topic_id}` | Bust cache so notes regenerate |
+| `POST /api/mcq/generate` | Generate a 10-question MCQ set for a topic (cached after first generation) |
+| `GET  /api/mcq/{topic_id}` | Fetch cached MCQ set without LLM call |
+| `DELETE /api/mcq/{topic_id}` | Bust cache so the MCQ set regenerates |
 | `GET  /health` | Health check |
 
 **Storage:** SQLite (`studyos.db`) — no Docker, no Postgres, no Redis needed.  
@@ -96,11 +99,30 @@ curl -X POST http://localhost:8000/api/notes/generate \
   -d '{ ..., "force_regenerate": true }'
 ```
 
+**Generate an MCQ set:**
+```bash
+curl -X POST http://localhost:8000/api/mcq/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic_id": "t-ht-001",
+    "topic_name": "Fourier'\''s Law of Heat Conduction",
+    "subject": "Heat Transfer",
+    "count": 10,
+    "difficulty": "mixed",
+    "syllabus_context": ["Thermal Resistance", "Critical Radius", "Extended Surfaces"]
+  }'
+```
+
+**Fetch cached MCQ set:**
+```bash
+curl http://localhost:8000/api/mcq/t-ht-001
+```
+
 ---
 
 ## Phase 2 validation checklist
 
-Before moving to Phase 3, verify:
+**Status: explicitly deferred (2026-06-21).** Architecture, prompt, validation layer, and frontend wiring are complete and build-clean, but the items below were not formally verified before moving to Phase 3. Decision: proceed anyway, revisit before real users.
 
 - [ ] 3 different university PDF formats parse correctly
 - [ ] 10 different topics generate consistently useful notes
@@ -110,11 +132,21 @@ Before moving to Phase 3, verify:
 - [ ] Notes contract matches `contracts/notes.contract.json` exactly
 - [ ] Cost per notes generation is acceptable (log token usage)
 
+## Phase 3 validation checklist — MCQ
+
+Same status as above: code-level verification only (Pydantic validation tested against contract examples, generate → cache → fetch → delete cycle tested end-to-end with a mocked LLM, malformed-JSON failure path confirmed to return 502). Not yet validated:
+
+- [ ] 10+ topics across different subjects produce plausible, non-absurd distractors
+- [ ] Explanations actually address a specific wrong option, not just restate the question
+- [ ] Difficulty distribution in "mixed" mode roughly matches 30/50/20 easy/medium/hard over multiple generations
+- [ ] No question stem gives away the answer through phrasing
+- [ ] Cost per MCQ generation is acceptable (log token usage)
+
 ---
 
-## What's NOT here yet (Phase 3+)
+## What's NOT here yet (Phase 3 remainder, Phase 4+)
 
-- MCQ, Numericals, Chat, Study Plan endpoints
+- Numericals, Chat, Study Plan endpoints
 - MySQL migration (stays SQLite until needed)
 - Qdrant / vector search (add when Chat RAG is built)
 - Celery + Redis (add when generation exceeds 30 seconds consistently)

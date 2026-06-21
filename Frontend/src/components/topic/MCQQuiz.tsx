@@ -1,13 +1,16 @@
 "use client";
 import { useState } from "react";
-import { HelpCircle, CheckCircle2, XCircle, RotateCcw, Trophy } from "lucide-react";
+import { HelpCircle, CheckCircle2, XCircle, RotateCcw, Trophy, Zap } from "lucide-react";
 import type { MCQSet, MCQOption, MCQState } from "@/types";
-import { mockGenerateMCQ } from "@/lib/mock-api";
+import { mockGenerateMCQ, type StepCallback } from "@/lib/mock-api";
+import { generateMCQ, deleteMCQ, APIError } from "@/lib/api";
+import { USE_REAL_API } from "@/lib/flags";
 import { LoadingSteps } from "@/components/shared/LoadingSteps";
 import { ErrorState, StaleWarning, IdleGenerateCard } from "@/components/shared/StateComponents";
 import { Button } from "@/components/ui/button";
 
-const STEPS = ["Writing question stems…", "Crafting plausible distractors…", "Adding explanations…"];
+const MOCK_STEPS = ["Writing question stems…", "Crafting plausible distractors…", "Adding explanations…"];
+const REAL_STEPS = ["Sending to Claude…", "Writing question stems…", "Crafting plausible distractors…", "Validating output…"];
 const OPTIONS: MCQOption[] = ["A", "B", "C", "D"];
 
 const DIFFICULTY_STYLE: Record<string, string> = {
@@ -19,9 +22,12 @@ const DIFFICULTY_STYLE: Record<string, string> = {
 interface MCQQuizProps {
   topicId: string;
   topicName: string;
+  subject: string;
+  syllabusContext?: string[];
+  syllabusId?: string;
 }
 
-export function MCQQuiz({ topicId, topicName }: MCQQuizProps) {
+export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syllabusId }: MCQQuizProps) {
   const [status, setStatus] = useState<MCQState>("idle");
   const [data, setData] = useState<MCQSet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,25 +35,76 @@ export function MCQQuiz({ topicId, topicName }: MCQQuizProps) {
   const [answers, setAnswers] = useState<Record<number, MCQOption>>({});
   const [currentStep, setCurrentStep] = useState("");
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
+  const [wasCached, setWasCached] = useState(false);
 
-  const generate = async () => {
-    setStatus("loading");
+  const generate = async (forceRegenerate = false) => {
+    setStatus(forceRegenerate ? "regenerating" : "loading");
     setCompletedSteps([]);
     setCurrentIndex(0);
     setAnswers({});
     setError(null);
 
-    const onStep = (step: string) => {
-      setCurrentStep(step);
-      const idx = STEPS.indexOf(step);
-      setCompletedSteps(STEPS.slice(0, idx));
-    };
+    if (USE_REAL_API) {
+      await generateReal(forceRegenerate);
+    } else {
+      await generateMock();
+    }
+  };
 
+  const generateReal = async (forceRegenerate: boolean) => {
+    const steps = REAL_STEPS;
+    let stepIdx = 0;
+    setCurrentStep(steps[0]);
+
+    // Animate steps while waiting for the API (it takes ~15–25 s)
+    const ticker = setInterval(() => {
+      stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+      setCompletedSteps(steps.slice(0, stepIdx));
+      setCurrentStep(steps[stepIdx]);
+    }, 4000);
+
+    try {
+      const result = await generateMCQ({
+        topic_id: topicId,
+        topic_name: topicName,
+        subject,
+        count: 10,
+        difficulty: "mixed",
+        syllabus_context: syllabusContext,
+        syllabus_id: syllabusId,
+        force_regenerate: forceRegenerate,
+      });
+
+      clearInterval(ticker);
+      setWasCached(result._cached ?? false);
+      setData(result);
+      setStatus("in_progress");
+    } catch (err) {
+      clearInterval(ticker);
+      const msg =
+        err instanceof APIError
+          ? err.detail
+          : err instanceof Error
+          ? err.message
+          : "Quiz generation failed.";
+      setError(msg);
+      setStatus("error");
+    }
+  };
+
+  const generateMock = async () => {
+    const steps = MOCK_STEPS;
+    const onStep: StepCallback = (step) => {
+      setCurrentStep(step);
+      const idx = steps.indexOf(step);
+      setCompletedSteps(steps.slice(0, idx));
+    };
     try {
       const result = await mockGenerateMCQ(topicId, onStep);
       if (!result) {
         setStatus("empty");
       } else {
+        setWasCached(false);
         setData(result);
         setStatus("in_progress");
       }
@@ -55,6 +112,14 @@ export function MCQQuiz({ topicId, topicName }: MCQQuizProps) {
       setError("Quiz generation failed. Please try again.");
       setStatus("error");
     }
+  };
+
+  const handleRegenerate = async () => {
+    if (USE_REAL_API) {
+      // Delete cache first so a stale syllabus produces genuinely new questions
+      try { await deleteMCQ(topicId); } catch { /* ignore if not cached */ }
+    }
+    await generate(true);
   };
 
   const handleAnswer = (option: MCQOption) => {
@@ -84,20 +149,26 @@ export function MCQQuiz({ topicId, topicName }: MCQQuizProps) {
     return (
       <IdleGenerateCard
         label="Start Quiz"
-        description={`${topicName} — 8 questions, mix of easy, medium, and hard.`}
-        estimatedTime="~20 seconds to generate"
-        onGenerate={generate}
+        description={`${topicName} — 10 questions, mix of easy, medium, and hard.`}
+        estimatedTime={USE_REAL_API ? "~15–25 seconds" : "~2 seconds (mock)"}
+        onGenerate={() => generate()}
         icon={<HelpCircle size={22} />}
       />
     );
   }
 
   if (status === "loading" || status === "regenerating") {
-    return <LoadingSteps currentStep={currentStep} completedSteps={completedSteps} estimatedSeconds={20} />;
+    return (
+      <LoadingSteps
+        currentStep={currentStep}
+        completedSteps={completedSteps}
+        estimatedSeconds={USE_REAL_API ? 20 : 2}
+      />
+    );
   }
 
-  if (status === "error") return <ErrorState message={error ?? undefined} onRetry={generate} />;
-  if (status === "empty" || !data) return <ErrorState message="Not enough content to generate a quiz for this topic." onRetry={generate} />;
+  if (status === "error") return <ErrorState message={error ?? undefined} onRetry={() => generate()} />;
+  if (status === "empty" || !data) return <ErrorState message="Not enough content to generate a quiz for this topic." onRetry={() => generate()} />;
 
   // ── Completed ──
   if (status === "completed") {
@@ -148,12 +219,24 @@ export function MCQQuiz({ topicId, topicName }: MCQQuizProps) {
 
   return (
     <div className="flex flex-col gap-5">
-      {status === "stale" && <StaleWarning onRegenerate={() => { setStatus("regenerating"); generate(); }} />}
+      {status === "stale" && <StaleWarning onRegenerate={handleRegenerate} />}
 
       {/* Progress bar */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-500">Question {currentIndex + 1} of {total}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-gray-500">Question {currentIndex + 1} of {total}</span>
+            {currentIndex === 0 && !isAnswered && wasCached && (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                <Zap size={9} /> Instant (cached)
+              </span>
+            )}
+            {currentIndex === 0 && !isAnswered && USE_REAL_API && !wasCached && (
+              <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
+                Live · Claude
+              </span>
+            )}
+          </div>
           <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${DIFFICULTY_STYLE[question.difficulty]}`}>
             {question.difficulty}
           </span>

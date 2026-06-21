@@ -23,8 +23,20 @@ CREATE TABLE IF NOT EXISTS notes (
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_notes_topic_id ON notes (topic_id);
-CREATE INDEX IF NOT EXISTS idx_syllabi_user   ON syllabi (user_id);
+CREATE TABLE IF NOT EXISTS mcq_sets (
+    id          TEXT PRIMARY KEY,
+    syllabus_id TEXT,
+    topic_id    TEXT NOT NULL,
+    topic_name  TEXT NOT NULL,
+    subject     TEXT NOT NULL,
+    difficulty  TEXT NOT NULL DEFAULT 'mixed',
+    content_json TEXT NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_topic_id    ON notes (topic_id);
+CREATE INDEX IF NOT EXISTS idx_mcq_sets_topic_id ON mcq_sets (topic_id);
+CREATE INDEX IF NOT EXISTS idx_syllabi_user       ON syllabi (user_id);
 """
 
 

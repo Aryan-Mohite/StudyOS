@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
 from database import init_db
-from routers import notes, upload
+from routers import mcq, notes, upload
 
 
 @asynccontextmanager
@@ -17,8 +17,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="StudyOS API",
-    version="0.2.0",
-    description="Phase 2 — Notes + Syllabus Parser (SQLite, Claude direct calls)",
+    version="0.3.0",
+    description="Phase 3 — Notes + Syllabus Parser + MCQ (SQLite, Claude direct calls)",
     lifespan=lifespan,
 )
 
@@ -34,6 +34,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(upload.router, prefix="/api")
 app.include_router(notes.router,  prefix="/api")
+app.include_router(mcq.router,    prefix="/api")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
