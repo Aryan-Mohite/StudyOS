@@ -1,16 +1,18 @@
 /**
- * StudyOS API client — Phase 2
+ * StudyOS API client
  *
- * These functions call the real FastAPI backend.
- * Set NEXT_PUBLIC_API_URL in .env.local to point at the backend.
- * Set NEXT_PUBLIC_USE_REAL_API=true to activate real calls.
+ * Calls the Express gateway (Backend-Express) on port 3001.
+ * Express delegates AI work to the Python AgenticService on port 8000.
+ *
+ * Set NEXT_PUBLIC_API_URL in .env.local to override (default: http://localhost:3001).
+ * Set NEXT_PUBLIC_USE_REAL_API=true to activate real API calls.
  *
  * When USE_REAL_API is false (or unset), components fall back to mock-api.ts.
  */
 
 import type { Syllabus, Note, MCQSet } from "@/types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

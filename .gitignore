@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env/
+
+# Build outputs
+.next/
+dist/
+build/
+*.egg-info/
+
+# Environment secrets — NEVER commit these
+.env
+.env.local
+.env.production
+*.env
+
+# DB files (generated at runtime)
+*.db
+*.db-shm
+*.db-wal
+
+# Uploads (user data)
+uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Python
+*.pyo
+*.pyd
+.Python
+pip-log.txt
