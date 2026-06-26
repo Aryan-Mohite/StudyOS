@@ -4,6 +4,8 @@ Pure AI layer: PDF parsing, notes generation, MCQ generation.
 No database. No caching. That's the Express layer's job.
 """
 
+import os
+
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,14 +19,18 @@ from services.pdf_parser import extract_pdf_text, parse_syllabus
 
 app = FastAPI(
     title="StudyOS AgenticService",
-    description="Internal AI service — not exposed directly to browser clients. Called only by the Express gateway.",
+    description="Internal AI service — not exposed directly to browser clients. Called only by the Next.js API routes.",
     version="1.0.0",
 )
 
-# Only allow calls from the Express backend (or localhost in dev)
+# Only allow calls from the Next.js app (dev: localhost:3000, prod: your Vercel URL).
+# Set ALLOWED_ORIGINS as a comma-separated list in .env, e.g.:
+#   ALLOWED_ORIGINS=https://studyos.vercel.app,http://localhost:3000
+_allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001", "http://127.0.0.1:3001"],
+    allow_origins=[o.strip() for o in _allowed_origins if o.strip()],
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
 )

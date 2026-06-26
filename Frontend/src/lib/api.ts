@@ -1,10 +1,12 @@
 /**
  * StudyOS API client
  *
- * Calls the Express gateway (Backend-Express) on port 3001.
- * Express delegates AI work to the Python AgenticService on port 8000.
+ * Calls the Next.js API routes (Frontend/src/app/api/**) directly — same
+ * origin, so no separate gateway service is needed. Those routes delegate
+ * AI work server-side to the Python AgenticService and cache results in MySQL.
  *
- * Set NEXT_PUBLIC_API_URL in .env.local to override (default: http://localhost:3001).
+ * Set NEXT_PUBLIC_API_URL in .env.local only if you ever split the API
+ * routes into a separately-deployed service (default: same origin, "").
  * Set NEXT_PUBLIC_USE_REAL_API=true to activate real API calls.
  *
  * When USE_REAL_API is false (or unset), components fall back to mock-api.ts.
@@ -12,7 +14,7 @@
 
 import type { Syllabus, Note, MCQSet } from "@/types";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
