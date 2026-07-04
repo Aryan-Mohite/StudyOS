@@ -91,3 +91,46 @@ export async function generateMCQ(
   });
   return handle(res);
 }
+
+export interface GenerateNumericalsPayload {
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  count: number;
+  difficulty: string;
+  syllabus_context: string[];
+}
+
+export async function generateNumericals(
+  payload: GenerateNumericalsPayload,
+): Promise<{ numerical_set_id: string; [key: string]: unknown }> {
+  const res = await fetch(`${AGENTIC}/agent/generate-numericals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    // Numericals can take longer than notes/MCQ — worked steps for each problem.
+    signal: AbortSignal.timeout(75_000),
+  });
+  return handle(res);
+}
+
+export interface TutorChatPayload {
+  session_id: string;
+  question: string;
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  syllabus_context: string[];
+}
+
+export async function tutorChat(
+  payload: TutorChatPayload,
+): Promise<{ message_id: string; [key: string]: unknown }> {
+  const res = await fetch(`${AGENTIC}/agent/tutor-chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(45_000),
+  });
+  return handle(res);
+}

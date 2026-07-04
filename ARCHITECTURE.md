@@ -24,17 +24,22 @@ layer (merged), and a Python service stays separate purely for AI work.
 │  Python AgenticService  (FastAPI)         │
 │  Deployed to Railway / Render             │
 │  • Pure AI — no DB, no cache              │
+│  • LangChain (ChatAnthropic) + LangGraph  │
+│    workflows — see App/agents,            │
+│    App/workflows                          │
 │  • PDF extraction (pdfplumber)            │
-│  • Claude API calls                       │
 │  • Pydantic contract validation           │
 │  • Syllabus parsing                       │
-│  • Notes generation                       │
+│  • Notes generation (+ RAG indexing)      │
 │  • MCQ generation                         │
+│  • Numericals generation                  │
+│  • AI Tutor chat (RAG + session memory)   │
 └──────────────┬──────────────────────────────┘
                │
                ▼
-        (no DB connection —
-         stateless AI layer)
+     (vector_db/ — local Chroma store
+      over generated notes, used by
+      Tutor Chat retrieval only)
 
 ┌───────────────────────────────────────────┐
 │  MySQL                                     │
@@ -42,6 +47,28 @@ layer (merged), and a Python service stays separate purely for AI work.
 │  PlanetScale / Railway / Aiven all work.  │
 └───────────────────────────────────────────┘
 ```
+
+## AgenticService internals (LangChain / LangGraph)
+
+As of the LangGraph migration, `AgenticService/` is organized as:
+
+```
+AgenticService/
+  App/
+    agents/       ← one file per feature: prompt + Pydantic validation
+    services/     ← llm_service.py (ChatAnthropic wrapper), pdf_service.py,
+                     rag_service.py (Chroma vector store)
+    workflows/     ← one LangGraph graph per feature — main.py calls these
+    prompts/       ← .md prompt contracts (unchanged content, moved here)
+  vector_db/       ← Chroma persistence for Tutor Chat retrieval
+  main.py, config.py, requirements.txt
+```
+
+Notes/MCQ/Numericals are single-node graphs (generate → validate); Tutor Chat
+is the one genuinely multi-step graph (retrieve → generate) with LangGraph's
+`MemorySaver` checkpointer carrying conversation history per session. See
+`AgenticService/MIGRATION_NOTES.md` for the full rationale and what's ported
+vs. newly built.
 
 ## What changed from the original 3-layer design
 
@@ -122,7 +149,10 @@ There is no separate gateway step anymore — Next.js *is* the gateway.
 |---|---|
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
 | `PORT` | Default 8000 (Railway/Render set this automatically in prod) |
+| `MODEL_NAME` | Default `claude-sonnet-4-6` |
 | `ALLOWED_ORIGINS` | Comma-separated list of origins allowed to call this service (your Next.js URL) |
+| `VECTOR_DB_DIR` | Default `vector_db` — local Chroma persistence path for Tutor Chat RAG |
+| `EMBEDDING_MODEL` | Default `sentence-transformers/all-MiniLM-L6-v2` — local embeddings, no extra API key needed |
 
 ### Frontend (.env.local)
 | Key | Description |
@@ -146,6 +176,13 @@ POST   /api/mcq/generate        ← generate or return cached MCQ set
 GET    /api/mcq/:topicId        ← fetch cached MCQ set
 DELETE /api/mcq/:topicId        ← delete cached MCQ set
 
+POST   /api/numericals/generate ← generate or return cached numericals set
+GET    /api/numericals/:topicId ← fetch cached numericals set
+DELETE /api/numericals/:topicId ← delete cached numericals set
+
+POST   /api/chat                ← forward one tutor-chat turn (no caching —
+                                    memory lives in the AgenticService)
+
 GET    /api/health              ← API health check
 ```
 
@@ -157,21 +194,24 @@ its base URL (now same-origin by default).
 
 ```
 POST  /agent/parse-syllabus     ← PDF bytes → structured syllabus JSON
-POST  /agent/generate-notes     ← topic params → Notes contract JSON
+POST  /agent/generate-notes     ← topic params → Notes contract JSON (+ RAG indexing)
 POST  /agent/generate-mcq       ← topic params → MCQ contract JSON
+POST  /agent/generate-numericals ← topic params → Numericals contract JSON
+POST  /agent/tutor-chat         ← session_id + question → Tutor response JSON
 
 GET   /health                   ← agentic layer health check
 ```
 
-Unchanged from the original design.
+Each endpoint delegates to a LangGraph workflow in `App/workflows/`.
 
-## Adding a new feature (e.g. Numericals)
+## Adding a new feature (e.g. Study Plan)
 
-1. Add prompt → `AgenticService/prompts/numericals_generator.md`
-2. Add service → `AgenticService/services/numericals_service.py` (Pydantic models + Claude call)
-3. Add endpoint → `AgenticService/main.py` (`POST /agent/generate-numericals`)
-4. Add route → `Frontend/src/app/api/numericals/generate/route.ts` (cache-first, mirrors `notes/generate/route.ts`)
-5. Add MySQL table → `Frontend/src/lib/db.ts`
-6. Wire frontend → replace mock in `NumericalsView.tsx` with an `api.ts` call
+1. Add prompt → `AgenticService/App/prompts/study_plan_generator.md`
+2. Add agent → `AgenticService/App/agents/study_plan_agent.py` (Pydantic models + Claude call via `llm_service`)
+3. Add workflow → `AgenticService/App/workflows/study_plan_workflow.py` (LangGraph graph wrapping the agent)
+4. Add endpoint → `AgenticService/main.py` (`POST /agent/generate-study-plan`)
+5. Add route → `Frontend/src/app/api/plan/generate/route.ts` (cache-first, mirrors `numericals/generate/route.ts`)
+6. Add MySQL table → `Frontend/src/lib/db.ts`
+7. Wire frontend → replace mock in the Study Plan view with an `api.ts` call, flip its flag in `flags.ts`
 
 Same pattern every time. No architectural decisions needed.

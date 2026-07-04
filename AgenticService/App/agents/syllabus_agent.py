@@ -1,31 +1,19 @@
 """
-pdf_parser.py — PDF text extraction and syllabus parsing via Claude.
+syllabus_agent.py — Parses raw syllabus text into the structured syllabus
+contract via Claude (through llm_service). Pure agent logic; the LangGraph
+wrapper lives in App/workflows/syllabus_workflow.py.
 """
 
-import io
 import uuid
 from pathlib import Path
 
-import pdfplumber
-
-from services.llm import call_claude_json
+from App.services.llm_service import call_llm_json
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "syllabus_parser.md"
 
 
 def _load_prompt() -> str:
     return _PROMPT_PATH.read_text(encoding="utf-8")
-
-
-def extract_pdf_text(file_bytes: bytes) -> str:
-    """Extract all text from a PDF given its raw bytes."""
-    text_pages: list[str] = []
-    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-        for page in pdf.pages:
-            page_text = page.extract_text()
-            if page_text and page_text.strip():
-                text_pages.append(page_text)
-    return "\n\n".join(text_pages)
 
 
 def _inject_ids(parsed: dict) -> dict:
@@ -47,7 +35,7 @@ def _inject_ids(parsed: dict) -> dict:
 def parse_syllabus(raw_text: str, filename: str) -> dict:
     """
     Send raw PDF text to Claude → get back structured syllabus dict.
-    Truncates to ~8 000 chars; injects UUIDs for any missing IDs.
+    Truncates to ~8,000 chars; injects UUIDs for any missing IDs.
     """
     truncated = raw_text[:8_000]
     if len(raw_text) > 8_000:
@@ -59,5 +47,5 @@ def parse_syllabus(raw_text: str, filename: str) -> dict:
         f"Raw syllabus text:\n---\n{truncated}\n---"
     )
 
-    parsed = call_claude_json(_load_prompt(), user_prompt, max_tokens=4096)
+    parsed = call_llm_json(_load_prompt(), user_prompt, max_tokens=4096)
     return _inject_ids(parsed)

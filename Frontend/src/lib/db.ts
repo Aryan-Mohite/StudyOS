@@ -72,6 +72,18 @@ CREATE TABLE IF NOT EXISTS mcq_sets (
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_mcq_sets_topic_id (topic_id)
 );
+
+CREATE TABLE IF NOT EXISTS numerical_sets (
+  id           VARCHAR(64) PRIMARY KEY,
+  syllabus_id  VARCHAR(64),
+  topic_id     VARCHAR(128) NOT NULL,
+  topic_name   VARCHAR(512) NOT NULL,
+  subject      VARCHAR(256) NOT NULL,
+  difficulty   VARCHAR(32) NOT NULL DEFAULT 'mixed',
+  content_json LONGTEXT NOT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_numerical_sets_topic_id (topic_id)
+);
 `;
 
 let _initialized = false;

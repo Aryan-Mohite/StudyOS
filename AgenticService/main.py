@@ -1,7 +1,11 @@
 """
 main.py — StudyOS AgenticService
-Pure AI layer: PDF parsing, notes generation, MCQ generation.
+Pure AI layer: PDF parsing, notes/MCQ/numericals generation, tutor chat.
 No database. No caching. That's the Express layer's job.
+
+Every endpoint below delegates to a LangGraph workflow in App/workflows/,
+which in turn calls an agent in App/agents/. See ARCHITECTURE.md for the
+full request flow.
 """
 
 import os
@@ -12,20 +16,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config import settings
-from services.llm import call_claude_json
-from services.mcq_service import generate_mcq
-from services.notes_service import generate_notes
-from services.pdf_parser import extract_pdf_text, parse_syllabus
+from App.services.pdf_service import extract_pdf_text
+from App.workflows.mcq_workflow import run_mcq_generation
+from App.workflows.notes_workflow import run_notes_generation
+from App.workflows.numericals_workflow import run_numericals_generation
+from App.workflows.syllabus_workflow import run_syllabus_parse
+from App.workflows.tutor_workflow import run_tutor_turn
 
 app = FastAPI(
     title="StudyOS AgenticService",
-    description="Internal AI service — not exposed directly to browser clients. Called only by the Next.js API routes.",
-    version="1.0.0",
+    description="Internal AI service — not exposed directly to browser clients. Called only by the Next.js API routes / Express gateway.",
+    version="2.0.0",
 )
 
-# Only allow calls from the Next.js app (dev: localhost:3000, prod: your Vercel URL).
-# Set ALLOWED_ORIGINS as a comma-separated list in .env, e.g.:
-#   ALLOWED_ORIGINS=https://studyos.vercel.app,http://localhost:3000
 _allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
 app.add_middleware(
@@ -40,7 +43,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "layer": "python-agentic", "model": "claude-sonnet-4-6"}
+    return {"status": "ok", "layer": "python-agentic", "model": settings.model_name}
 
 
 # ── Syllabus parsing ──────────────────────────────────────────────────────────
@@ -50,10 +53,6 @@ async def agent_parse_syllabus(
     file: UploadFile = File(...),
     filename: str = Form(default=""),
 ):
-    """
-    Accept a raw PDF upload, extract text, send to Claude for syllabus parsing.
-    Returns the structured syllabus JSON (with injected UUIDs).
-    """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
@@ -64,10 +63,7 @@ async def agent_parse_syllabus(
     try:
         raw_text = extract_pdf_text(raw_bytes)
     except Exception as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=f"PDF text extraction failed: {exc}",
-        ) from exc
+        raise HTTPException(status_code=422, detail=f"PDF text extraction failed: {exc}") from exc
 
     if not raw_text.strip():
         raise HTTPException(
@@ -76,7 +72,7 @@ async def agent_parse_syllabus(
         )
 
     try:
-        parsed = parse_syllabus(raw_text, filename or file.filename)
+        parsed = run_syllabus_parse(raw_text, filename or file.filename)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -95,24 +91,17 @@ class NotesRequest(BaseModel):
 
 @app.post("/agent/generate-notes")
 async def agent_generate_notes(req: NotesRequest):
-    """
-    Generate study notes for a topic. Returns the full Notes contract JSON.
-    Raises 502 if the model returns malformed output after retries.
-    """
+    """Generates notes, then indexes them into the RAG vector store for Tutor Chat."""
     try:
-        result = generate_notes(
+        return run_notes_generation(
             topic_name=req.topic_name,
             subject=req.subject,
             unit_title=req.unit_title,
             topic_id=req.topic_id,
             syllabus_context=req.syllabus_context,
         )
-        return result
     except ValueError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Notes generation failed: {exc}",
-        ) from exc
+        raise HTTPException(status_code=502, detail=f"Notes generation failed: {exc}") from exc
 
 
 # ── MCQ generation ────────────────────────────────────────────────────────────
@@ -128,12 +117,8 @@ class MCQRequest(BaseModel):
 
 @app.post("/agent/generate-mcq")
 async def agent_generate_mcq(req: MCQRequest):
-    """
-    Generate an MCQ set for a topic. Returns the full MCQ contract JSON.
-    Raises 502 if the model returns malformed output after retries.
-    """
     try:
-        result = generate_mcq(
+        return run_mcq_generation(
             topic_name=req.topic_name,
             subject=req.subject,
             topic_id=req.topic_id,
@@ -141,12 +126,60 @@ async def agent_generate_mcq(req: MCQRequest):
             difficulty=req.difficulty,
             syllabus_context=req.syllabus_context,
         )
-        return result
     except ValueError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"MCQ generation failed: {exc}",
-        ) from exc
+        raise HTTPException(status_code=502, detail=f"MCQ generation failed: {exc}") from exc
+
+
+# ── Numericals generation ─────────────────────────────────────────────────────
+
+class NumericalsRequest(BaseModel):
+    topic_id: str
+    topic_name: str
+    subject: str
+    count: int = 5
+    difficulty: str = "mixed"
+    syllabus_context: list[str] = []
+
+
+@app.post("/agent/generate-numericals")
+async def agent_generate_numericals(req: NumericalsRequest):
+    try:
+        return run_numericals_generation(
+            topic_name=req.topic_name,
+            subject=req.subject,
+            topic_id=req.topic_id,
+            count=req.count,
+            difficulty=req.difficulty,
+            syllabus_context=req.syllabus_context,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=f"Numericals generation failed: {exc}") from exc
+
+
+# ── Tutor chat ────────────────────────────────────────────────────────────────
+
+class TutorRequest(BaseModel):
+    session_id: str  # e.g. f"{user_id}:{topic_id}" — stable per conversation
+    question: str
+    topic_id: str
+    topic_name: str
+    subject: str
+    syllabus_context: list[str] = []
+
+
+@app.post("/agent/tutor-chat")
+async def agent_tutor_chat(req: TutorRequest):
+    try:
+        return run_tutor_turn(
+            session_id=req.session_id,
+            question=req.question,
+            subject=req.subject,
+            topic_name=req.topic_name,
+            topic_id=req.topic_id,
+            syllabus_context=req.syllabus_context,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=f"Tutor response failed: {exc}") from exc
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

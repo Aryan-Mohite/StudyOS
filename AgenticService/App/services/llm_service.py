@@ -1,28 +1,43 @@
 """
-llm.py — Core Claude API helpers for the AgenticService.
-No caching, no DB — pure model interaction.
+llm_service.py — LangChain wrapper around Claude for the AgenticService.
+
+Replaces the old raw `anthropic.Anthropic` client (services/llm.py) with
+`langchain_anthropic.ChatAnthropic` so every agent/workflow in App/ talks
+to the model through LangChain's standard interface. No caching, no DB —
+pure model interaction, same contract as before.
 """
 
 import json
 import re
 import time
+from typing import Optional
 
-import anthropic
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from config import settings
 
-_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-MODEL = "claude-sonnet-4-6"
+_llm_cache: dict[int, ChatAnthropic] = {}
 
 
-def call_claude(system: str, user: str, max_tokens: int = 4096) -> str:
-    """Call Claude and return raw text. Raises anthropic.APIError on failure."""
-    msg = _client.messages.create(
-        model=MODEL,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
-    return msg.content[0].text
+def get_llm(max_tokens: int = 4096, temperature: float = 0.0) -> ChatAnthropic:
+    """Return a cached ChatAnthropic instance for the given max_tokens."""
+    key = hash((max_tokens, temperature))
+    if key not in _llm_cache:
+        _llm_cache[key] = ChatAnthropic(
+            model=settings.model_name,
+            anthropic_api_key=settings.anthropic_api_key,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+    return _llm_cache[key]
+
+
+def call_llm(system: str, user: str, max_tokens: int = 4096) -> str:
+    """Call Claude via LangChain and return raw text."""
+    llm = get_llm(max_tokens=max_tokens)
+    response = llm.invoke([SystemMessage(content=system), HumanMessage(content=user)])
+    return response.content
 
 
 def extract_json(text: str) -> dict:
@@ -56,7 +71,7 @@ def extract_json(text: str) -> dict:
     )
 
 
-def call_claude_json(
+def call_llm_json(
     system: str,
     user: str,
     max_tokens: int = 4096,
@@ -64,9 +79,9 @@ def call_claude_json(
 ) -> dict:
     """
     Call Claude expecting JSON. Retries up to `retries` times on parse failure.
-    Second attempt appends a correction hint nudging the model back to raw JSON.
+    Second+ attempts append a correction hint nudging the model back to raw JSON.
     """
-    last_error: Exception | None = None
+    last_error: Optional[Exception] = None
 
     for attempt in range(retries + 1):
         prompt = user
@@ -77,7 +92,7 @@ def call_claude_json(
                 "Return ONLY a raw JSON object — no fences, no prose, nothing else."
             )
         try:
-            raw = call_claude(system, prompt, max_tokens)
+            raw = call_llm(system, prompt, max_tokens)
             return extract_json(raw)
         except (ValueError, json.JSONDecodeError) as exc:
             last_error = exc

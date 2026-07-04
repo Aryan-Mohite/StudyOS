@@ -8,9 +8,9 @@
  * Next.js app as Route Handlers — only override it if you split the API out.
  *
  * With USE_REAL_API=false (default), all features use mock data.
- * With USE_REAL_API=true, wired features (Notes, Upload, MCQ) use the real API.
- * Unwired features (Numericals, Chat, Plan) still fall back to mock until
- * their Phase 3 turn.
+ * With USE_REAL_API=true, all five features (Notes, Upload, MCQ, Numericals,
+ * Chat) use the real API. Study Plan still falls back to mock until its
+ * Phase 3 turn.
  */
 
 export const USE_REAL_API =

@@ -1,5 +1,5 @@
 """
-mcq_service.py — Generate MCQ sets via Claude, validate against contract.
+mcq_agent.py — Generate MCQ sets via Claude, validate against contract.
 """
 
 import uuid
@@ -9,7 +9,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator
 
-from services.llm import call_claude_json
+from App.services.llm_service import call_llm_json
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "mcq_generator.md"
 
@@ -34,6 +34,7 @@ class MCQQuestion(BaseModel):
     correct: Literal["A", "B", "C", "D"]
     explanation: str
     concept_tested: str
+    difficulty: Literal["easy", "medium", "hard"]
 
     @field_validator("question")
     @classmethod
@@ -55,8 +56,8 @@ class MCQResponse(BaseModel):
     topic_id: str
     topic: str
     subject: str
-    difficulty: str
     generated_at: str
+    total_questions: int
     questions: list[MCQQuestion]
 
     @field_validator("questions")
@@ -67,7 +68,7 @@ class MCQResponse(BaseModel):
         return v
 
 
-# ── Main service function ─────────────────────────────────────────────────────
+# ── Main agent function ───────────────────────────────────────────────────────
 
 def generate_mcq(
     topic_name: str,
@@ -75,7 +76,7 @@ def generate_mcq(
     topic_id: str,
     count: int = 10,
     difficulty: str = "mixed",
-    syllabus_context: list[str] | None = None,
+    syllabus_context: Optional[list[str]] = None,
 ) -> dict:
     """
     Call Claude to generate an MCQ set for a topic.
@@ -93,16 +94,15 @@ Syllabus context (other topics in this unit): {context_str}
 The student is preparing for undergraduate engineering exams.
 Return the JSON MCQ set object."""
 
-    raw = call_claude_json(_load_prompt(), user_prompt, max_tokens=4096, retries=2)
+    raw = call_llm_json(_load_prompt(), user_prompt, max_tokens=4096, retries=2)
 
-    # Stamp server-controlled fields
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     raw["mcq_set_id"] = str(uuid.uuid4())
     raw["topic_id"] = topic_id
     raw["topic"] = topic_name
     raw["subject"] = subject
-    raw["difficulty"] = difficulty
     raw["generated_at"] = now
+    raw["total_questions"] = len(raw.get("questions", []))
 
     validated = MCQResponse.model_validate(raw)
     return validated.model_dump()

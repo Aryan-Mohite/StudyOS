@@ -1,5 +1,7 @@
 """
-notes_service.py — Generate study notes via Claude, validate against contract.
+notes_agent.py — Generate study notes via Claude, validate against contract.
+Agent-level logic only; orchestration (retry/index-into-RAG) lives in
+App/workflows/notes_workflow.py.
 """
 
 import uuid
@@ -9,7 +11,7 @@ from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
-from services.llm import call_claude_json
+from App.services.llm_service import call_llm_json
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "notes_generator.md"
 
@@ -57,14 +59,14 @@ class NoteResponse(BaseModel):
         return v
 
 
-# ── Main service function ─────────────────────────────────────────────────────
+# ── Main agent function ───────────────────────────────────────────────────────
 
 def generate_notes(
     topic_name: str,
     subject: str,
     unit_title: str,
     topic_id: str,
-    syllabus_context: list[str] | None = None,
+    syllabus_context: Optional[list[str]] = None,
 ) -> dict:
     """
     Call Claude to generate study notes for a topic.
@@ -82,13 +84,12 @@ Other topics in this unit (for context and related_topics): {context_str}
 
 The student is preparing for undergraduate engineering exams. Return the JSON notes object."""
 
-    raw = call_claude_json(_load_prompt(), user_prompt, max_tokens=4096, retries=2)
+    raw = call_llm_json(_load_prompt(), user_prompt, max_tokens=4096, retries=2)
 
-    # Stamp server-controlled fields before validation
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     raw["note_id"] = str(uuid.uuid4())
     raw["topic_id"] = topic_id
-    raw["topic"] = topic_name        # enforce — don't trust LLM to copy exactly
+    raw["topic"] = topic_name
     raw["subject"] = subject
     raw["generated_at"] = now
 

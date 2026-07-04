@@ -3,10 +3,14 @@ import { useState, useRef, useEffect } from "react";
 import { Send, MessageSquare, Bot, User } from "lucide-react";
 import type { ChatMessage, TutorResponse } from "@/types";
 import { mockChat, getSuggestedQuestions } from "@/lib/mock-api";
+import { sendChatMessage, APIError } from "@/lib/api";
+import { USE_REAL_API } from "@/lib/flags";
 
 interface ChatPanelProps {
   topicId: string | null;
   topicName: string | null;
+  subject?: string;
+  syllabusContext?: string[];
 }
 
 interface DisplayMessage {
@@ -15,7 +19,7 @@ interface DisplayMessage {
   isOutOfScope?: boolean;
 }
 
-export function ChatPanel({ topicId, topicName }: ChatPanelProps) {
+export function ChatPanel({ topicId, topicName, subject, syllabusContext = [] }: ChatPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -29,27 +33,37 @@ export function ChatPanel({ topicId, topicName }: ChatPanelProps) {
   }, [messages, isLoading]);
 
   const send = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+    if (!text.trim() || isLoading || !topicId || !topicName) return;
     const userMsg: DisplayMessage = { role: "user", content: text.trim() };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
 
     try {
-      const history: ChatMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
-      const response: TutorResponse = await mockChat(
-        [...history, { role: "user", content: text.trim() }],
-        topicId
-      );
+      let response: TutorResponse;
+      if (USE_REAL_API) {
+        response = await sendChatMessage({
+          session_id: `dev-user-01:${topicId}`,
+          question: text.trim(),
+          topic_id: topicId,
+          topic_name: topicName,
+          subject: subject ?? "",
+          syllabus_context: syllabusContext,
+        });
+      } else {
+        const history: ChatMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
+        response = await mockChat([...history, { role: "user", content: text.trim() }], topicId);
+      }
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: response.answer, isOutOfScope: response.out_of_scope },
       ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Couldn't get a response. Try again." },
-      ]);
+    } catch (err) {
+      const msg =
+        err instanceof APIError
+          ? err.detail
+          : "Couldn't get a response. Try again.";
+      setMessages((prev) => [...prev, { role: "assistant", content: msg }]);
     } finally {
       setIsLoading(false);
     }

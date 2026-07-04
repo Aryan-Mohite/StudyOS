@@ -12,7 +12,7 @@
  * When USE_REAL_API is false (or unset), components fall back to mock-api.ts.
  */
 
-import type { Syllabus, Note, MCQSet } from "@/types";
+import type { Syllabus, Note, MCQSet, NumericalSet, TutorResponse, ChatMessage } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -127,6 +127,55 @@ export async function deleteMCQ(topicId: string): Promise<void> {
 
 export async function checkHealth(): Promise<{ status: string; version: string }> {
   return request("/health");
+}
+
+// ─── Numericals ─────────────────────────────────────────────────────────────────
+
+export interface GenerateNumericalsInput {
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  count?: number;
+  difficulty?: "easy" | "medium" | "hard" | "mixed";
+  syllabus_context?: string[];
+  syllabus_id?: string;
+  force_regenerate?: boolean;
+}
+
+export async function generateNumericals(
+  input: GenerateNumericalsInput,
+): Promise<NumericalSet & { _cached: boolean }> {
+  return request<NumericalSet & { _cached: boolean }>("/api/numericals/generate", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getNumericals(topicId: string): Promise<NumericalSet> {
+  return request<NumericalSet>(`/api/numericals/${topicId}`);
+}
+
+export async function deleteNumericals(topicId: string): Promise<void> {
+  await request<void>(`/api/numericals/${topicId}`, { method: "DELETE" });
+}
+
+// ─── AI Tutor Chat ────────────────────────────────────────────────────────────
+
+export interface SendChatMessageInput {
+  session_id: string;
+  question: string;
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  syllabus_context?: string[];
+  history?: ChatMessage[]; // for callers that also want to keep local UI history
+}
+
+export async function sendChatMessage(input: SendChatMessageInput): Promise<TutorResponse> {
+  return request<TutorResponse>("/api/chat", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export { APIError };

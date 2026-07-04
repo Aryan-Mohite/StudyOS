@@ -109,7 +109,9 @@ export default function StudyPage() {
             <NumericalsView
               topicId={topicId}
               topicName={topic.name}
+              subject={topic.subject}
               hasNumericals={topic.has_numericals}
+              syllabusContext={syllabusContext}
             />
           )}
           {activeTab === "mcq" && (
@@ -139,7 +141,12 @@ export default function StudyPage() {
           </button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <ChatPanel topicId={topicId} topicName={topic.name} />
+          <ChatPanel
+            topicId={topicId}
+            topicName={topic.name}
+            subject={topic.subject}
+            syllabusContext={syllabusContext}
+          />
         </div>
       </aside>
     </div>

@@ -1,15 +1,24 @@
 "use client";
 import { useState } from "react";
-import { Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import type { NumericalSet, NumericalsState } from "@/types";
 import { mockGenerateNumericals } from "@/lib/mock-api";
+import { generateNumericals, deleteNumericals, APIError } from "@/lib/api";
+import { USE_REAL_API } from "@/lib/flags";
 import { LoadingSteps } from "@/components/shared/LoadingSteps";
 import { EmptyState, ErrorState, StaleWarning, FormulaBlock, IdleGenerateCard } from "@/components/shared/StateComponents";
 
-const STEPS = [
+const MOCK_STEPS = [
   "Selecting problem types for this topic…",
   "Writing step-by-step solutions…",
   "Verifying answers and difficulty spread…",
+];
+
+const REAL_STEPS = [
+  "Sending to Claude…",
+  "Working out each problem…",
+  "Writing step-by-step solutions…",
+  "Validating answers and units…",
 ];
 
 const DIFFICULTY_STYLE: Record<string, string> = {
@@ -21,33 +30,89 @@ const DIFFICULTY_STYLE: Record<string, string> = {
 interface NumericalsViewProps {
   topicId: string;
   topicName: string;
+  subject: string;
   hasNumericals: boolean;
+  syllabusContext?: string[];
+  syllabusId?: string;
 }
 
-export function NumericalsView({ topicId, topicName, hasNumericals }: NumericalsViewProps) {
+export function NumericalsView({
+  topicId,
+  topicName,
+  subject,
+  hasNumericals,
+  syllabusContext = [],
+  syllabusId,
+}: NumericalsViewProps) {
   const [status, setStatus] = useState<NumericalsState>("idle");
   const [data, setData] = useState<NumericalSet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [wasCached, setWasCached] = useState(false);
   const [currentStep, setCurrentStep] = useState("");
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
 
-  const generate = async () => {
-    setStatus("loading");
+  const generate = async (forceRegenerate = false) => {
+    setStatus(forceRegenerate ? "regenerating" : "loading");
     setCompletedSteps([]);
     setError(null);
 
+    if (USE_REAL_API) {
+      await generateReal(forceRegenerate);
+    } else {
+      await generateMock();
+    }
+  };
+
+  const generateReal = async (forceRegenerate: boolean) => {
+    const steps = REAL_STEPS;
+    let stepIdx = 0;
+    setCurrentStep(steps[0]);
+    const ticker = setInterval(() => {
+      stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+      setCompletedSteps(steps.slice(0, stepIdx));
+      setCurrentStep(steps[stepIdx]);
+    }, 4000);
+
+    try {
+      const result = await generateNumericals({
+        topic_id: topicId,
+        topic_name: topicName,
+        subject,
+        syllabus_context: syllabusContext,
+        syllabus_id: syllabusId,
+        force_regenerate: forceRegenerate,
+      });
+      clearInterval(ticker);
+      setWasCached(result._cached ?? false);
+      setData(result);
+      setStatus("success");
+    } catch (err) {
+      clearInterval(ticker);
+      const msg =
+        err instanceof APIError
+          ? err.detail
+          : err instanceof Error
+          ? err.message
+          : "Problem generation failed.";
+      setError(msg);
+      setStatus("error");
+    }
+  };
+
+  const generateMock = async () => {
+    const steps = MOCK_STEPS;
     const onStep = (step: string) => {
       setCurrentStep(step);
-      const idx = STEPS.indexOf(step);
-      setCompletedSteps(STEPS.slice(0, idx));
+      const idx = steps.indexOf(step);
+      setCompletedSteps(steps.slice(0, idx));
     };
-
     try {
       const result = await mockGenerateNumericals(topicId, onStep);
       if (!result) {
         setStatus("empty");
       } else {
+        setWasCached(false);
         setData(result);
         setStatus("success");
       }
@@ -55,6 +120,13 @@ export function NumericalsView({ topicId, topicName, hasNumericals }: Numericals
       setError("Problem generation failed. Please try again.");
       setStatus("error");
     }
+  };
+
+  const handleRegenerate = async () => {
+    if (USE_REAL_API) {
+      try { await deleteNumericals(topicId); } catch { /* ignore if not cached */ }
+    }
+    await generate(true);
   };
 
   if (!hasNumericals && status === "idle") {
@@ -70,19 +142,25 @@ export function NumericalsView({ topicId, topicName, hasNumericals }: Numericals
     return (
       <IdleGenerateCard
         label="Generate Problems"
-        description={`5 fully solved problems with step-by-step solutions for "${topicName}".`}
-        estimatedTime="~30 seconds"
-        onGenerate={generate}
+        description={`Fully solved problems with step-by-step solutions for "${topicName}".`}
+        estimatedTime={USE_REAL_API ? "~30–45 seconds" : "~30 seconds (mock)"}
+        onGenerate={() => generate()}
         icon={<Calculator size={22} />}
       />
     );
   }
 
   if (status === "loading" || status === "regenerating") {
-    return <LoadingSteps currentStep={currentStep} completedSteps={completedSteps} estimatedSeconds={30} />;
+    return (
+      <LoadingSteps
+        currentStep={currentStep}
+        completedSteps={completedSteps}
+        estimatedSeconds={USE_REAL_API ? 40 : 30}
+      />
+    );
   }
 
-  if (status === "error") return <ErrorState message={error ?? undefined} onRetry={generate} />;
+  if (status === "error") return <ErrorState message={error ?? undefined} onRetry={() => generate()} />;
   if (status === "empty" || !data) {
     return (
       <EmptyState
@@ -94,14 +172,26 @@ export function NumericalsView({ topicId, topicName, hasNumericals }: Numericals
 
   return (
     <div className="flex flex-col gap-4">
-      {status === "stale" && <StaleWarning onRegenerate={() => { setStatus("regenerating"); generate(); }} />}
+      {status === "stale" && <StaleWarning onRegenerate={handleRegenerate} />}
 
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-lg font-bold text-gray-900">{data.topic}</h2>
-          <p className="mt-0.5 text-xs text-gray-400">{data.problems.length} problems · {data.subject}</p>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="text-xs text-gray-400">{data.problems.length} problems · {data.subject}</p>
+            {wasCached && (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                <Zap size={9} /> Instant (cached)
+              </span>
+            )}
+            {USE_REAL_API && !wasCached && (
+              <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
+                Live · Claude
+              </span>
+            )}
+          </div>
         </div>
-        <button onClick={() => { setStatus("regenerating"); generate(); }} className="text-xs text-brand-500 hover:text-brand-700 font-medium transition-colors">
+        <button onClick={handleRegenerate} className="text-xs text-brand-500 hover:text-brand-700 font-medium transition-colors">
           Regenerate
         </button>
       </div>
