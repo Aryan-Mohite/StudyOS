@@ -1,12 +1,59 @@
 import Link from "next/link";
-import { Upload, Calendar, BookOpen, ArrowRight, Beaker } from "lucide-react";
+import { Upload, Calendar, BookOpen, ArrowRight, Beaker, FileUp } from "lucide-react";
+import { auth } from "@clerk/nextjs/server";
 import { SyllabusTree } from "@/components/dashboard/SyllabusTree";
 import { Button } from "@/components/ui/button";
 import { mockSyllabus } from "@/mocks";
-import type { SyllabusSubject } from "@/types";
+import { getPool, initDb } from "@/lib/db";
+import { USE_REAL_API } from "@/lib/flags";
+import type { RowDataPacket } from "mysql2";
+import type { Syllabus, SyllabusSubject } from "@/types";
 
-export default function DashboardPage() {
-  const syllabus = mockSyllabus;
+/** Fetch the signed-in user's most recently uploaded syllabus from MySQL. */
+async function fetchLatestSyllabus(): Promise<Syllabus | null> {
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  await initDb();
+  const pool = getPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT parsed_json FROM syllabi WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
+    [userId],
+  );
+  const row = rows[0];
+  return row ? (JSON.parse(row.parsed_json) as Syllabus) : null;
+}
+
+export default async function DashboardPage() {
+  // Live mode: use the real, per-user syllabus. Falls back to mock data
+  // (and never touches MySQL) when NEXT_PUBLIC_USE_REAL_API is off.
+  const syllabus = USE_REAL_API ? await fetchLatestSyllabus() : mockSyllabus;
+
+  if (!syllabus) {
+    return (
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-5 px-5 py-24 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
+          <FileUp size={26} className="text-brand-500" />
+        </div>
+        <div>
+          <h1 className="font-display text-xl font-bold text-gray-900">
+            No syllabus yet
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Upload your university syllabus PDF and StudyOS will turn it into
+            notes, MCQs, numericals, and a scoped AI tutor.
+          </p>
+        </div>
+        <Link href="/upload">
+          <Button size="lg">
+            <Upload size={16} />
+            Upload your syllabus
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
   const totalTopics = syllabus.subjects.reduce(
     (a: number, s: SyllabusSubject) => a + s.units.reduce((b: number, u) => b + u.topics.length, 0), 0
   );

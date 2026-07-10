@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getPool, initDb } from "@/lib/db";
 import { parseSyllabus, AgenticError } from "@/lib/agentic";
 
@@ -8,9 +9,12 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB — same limit as the old multe
 export async function POST(req: NextRequest) {
   await initDb();
 
+  const { userId: clerkUserId } = await auth();
   const form = await req.formData();
   const file = form.get("file");
-  const userId = (form.get("user_id") as string) ?? "dev-user-01";
+  // Prefer the authenticated Clerk user; fall back to the form field (or
+  // dev-user-01) only if this route is ever hit outside Clerk middleware.
+  const userId = clerkUserId ?? (form.get("user_id") as string) ?? "dev-user-01";
 
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ detail: "No PDF file provided." }, { status: 400 });

@@ -43,7 +43,9 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [] }:
       let response: TutorResponse;
       if (USE_REAL_API) {
         response = await sendChatMessage({
-          session_id: `dev-user-01:${topicId}`,
+          // Placeholder — the API route derives the real session_id
+          // server-side from the authenticated Clerk user + topicId.
+          session_id: `pending:${topicId}`,
           question: text.trim(),
           topic_id: topicId,
           topic_name: topicName,

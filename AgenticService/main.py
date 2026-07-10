@@ -43,7 +43,16 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "layer": "python-agentic", "model": settings.model_name}
+    return {
+        "status": "ok",
+        "layer": "python-agentic",
+        "provider": settings.llm_provider,
+        "model": {
+            "groq": settings.groq_model_name,
+            "gemini": settings.gemini_model_name,
+            "anthropic": settings.anthropic_model_name,
+        }.get(settings.llm_provider, "unknown"),
+    }
 
 
 # ── Syllabus parsing ──────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
 import { Brain, LayoutDashboard, Calendar, Upload } from "lucide-react";
 
 const NAV_LINKS = [
@@ -33,14 +34,9 @@ export function AppNavbar() {
           ))}
         </div>
 
-        {/* Dev user indicator */}
+        {/* Signed-in user */}
         <div className="ml-auto flex items-center gap-2">
-          <span className="rounded-full border border-dashed border-gray-300 px-2.5 py-0.5 text-[11px] text-gray-400">
-            dev-user-01
-          </span>
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-[12px] font-semibold text-brand-600">
-            D
-          </div>
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </div>
     </nav>

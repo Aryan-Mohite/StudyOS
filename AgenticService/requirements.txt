@@ -6,12 +6,18 @@ pydantic-settings>=2.3.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.9
 
-# LangChain / LangGraph stack (replaces raw `anthropic` client)
+# LangChain / LangGraph stack
 langchain>=0.3.0
-langchain-anthropic>=0.3.0
 langchain-core>=0.3.0
 langchain-text-splitters>=0.3.0
 langgraph>=0.2.0
+
+# LLM providers — only the one matching LLM_PROVIDER in .env is actually
+# used at runtime, but all three are installed so switching is a one-line
+# .env change, no reinstall needed.
+langchain-groq>=0.2.0
+langchain-google-genai>=2.0.0
+langchain-anthropic>=0.3.0
 
 # RAG (vector store for Tutor Chat, replaces the old Assets folder)
 langchain-chroma>=0.1.4

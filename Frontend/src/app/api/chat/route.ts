@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { tutorChat as callAgenticTutor, AgenticError } from "@/lib/agentic";
 
 /**
@@ -10,6 +11,7 @@ import { tutorChat as callAgenticTutor, AgenticError } from "@/lib/agentic";
  * by `session_id` (stable per user+topic conversation).
  */
 export async function POST(req: NextRequest) {
+  const { userId: clerkUserId } = await auth();
   const body = await req.json();
   const {
     question,
@@ -17,8 +19,9 @@ export async function POST(req: NextRequest) {
     topic_name,
     subject,
     syllabus_context = [],
-    user_id = "dev-user-01",
+    user_id: bodyUserId = "dev-user-01",
   } = body ?? {};
+  const user_id = clerkUserId ?? bodyUserId;
 
   if (!question || !topic_id || !topic_name || !subject) {
     return NextResponse.json(

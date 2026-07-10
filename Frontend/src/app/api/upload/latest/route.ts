@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getPool, initDb } from "@/lib/db";
 import type { RowDataPacket } from "mysql2";
 
@@ -6,7 +7,9 @@ import type { RowDataPacket } from "mysql2";
 export async function GET(req: NextRequest) {
   await initDb();
 
-  const userId = req.nextUrl.searchParams.get("user_id") ?? "dev-user-01";
+  const { userId: clerkUserId } = await auth();
+  const userId =
+    clerkUserId ?? req.nextUrl.searchParams.get("user_id") ?? "dev-user-01";
   const pool = getPool();
 
   const [rows] = await pool.query<RowDataPacket[]>(

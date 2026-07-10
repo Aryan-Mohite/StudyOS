@@ -1,10 +1,11 @@
 """
-llm_service.py — LangChain wrapper around Claude for the AgenticService.
+llm_service.py — LangChain wrapper around the configured LLM provider.
 
-Replaces the old raw `anthropic.Anthropic` client (services/llm.py) with
-`langchain_anthropic.ChatAnthropic` so every agent/workflow in App/ talks
-to the model through LangChain's standard interface. No caching, no DB —
-pure model interaction, same contract as before.
+Every agent/workflow in App/ talks to the model through this single
+`get_llm()` / `call_llm()` choke point, via LangChain's standard chat model
+interface. Which provider actually gets called (Groq, Gemini, or Anthropic)
+is controlled entirely by `LLM_PROVIDER` in .env — no agent code needs to
+change when you switch. No caching, no DB — pure model interaction.
 """
 
 import json
@@ -12,24 +13,63 @@ import re
 import time
 from typing import Optional
 
-from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import settings
 
-_llm_cache: dict[int, ChatAnthropic] = {}
+_llm_cache: dict[tuple, BaseChatModel] = {}
 
 
-def get_llm(max_tokens: int = 4096, temperature: float = 0.0) -> ChatAnthropic:
-    """Return a cached ChatAnthropic instance for the given max_tokens."""
-    key = hash((max_tokens, temperature))
-    if key not in _llm_cache:
-        _llm_cache[key] = ChatAnthropic(
-            model=settings.model_name,
+def _build_llm(max_tokens: int, temperature: float) -> BaseChatModel:
+    provider = settings.llm_provider.lower()
+
+    if provider == "groq":
+        from langchain_groq import ChatGroq
+
+        if not settings.groq_api_key:
+            raise ValueError("GROQ_API_KEY is not set (LLM_PROVIDER=groq).")
+        return ChatGroq(
+            model=settings.groq_model_name,
+            api_key=settings.groq_api_key,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+    if provider == "gemini":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        if not settings.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY is not set (LLM_PROVIDER=gemini).")
+        return ChatGoogleGenerativeAI(
+            model=settings.gemini_model_name,
+            google_api_key=settings.gemini_api_key,
+            max_output_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+    if provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
+        if not settings.anthropic_api_key:
+            raise ValueError("ANTHROPIC_API_KEY is not set (LLM_PROVIDER=anthropic).")
+        return ChatAnthropic(
+            model=settings.anthropic_model_name,
             anthropic_api_key=settings.anthropic_api_key,
             max_tokens=max_tokens,
             temperature=temperature,
         )
+
+    raise ValueError(
+        f"Unknown LLM_PROVIDER '{settings.llm_provider}'. Use 'groq', 'gemini', or 'anthropic'."
+    )
+
+
+def get_llm(max_tokens: int = 4096, temperature: float = 0.0) -> BaseChatModel:
+    """Return a cached chat model instance for the given provider/settings."""
+    key = (settings.llm_provider, max_tokens, temperature)
+    if key not in _llm_cache:
+        _llm_cache[key] = _build_llm(max_tokens, temperature)
     return _llm_cache[key]
 
 
