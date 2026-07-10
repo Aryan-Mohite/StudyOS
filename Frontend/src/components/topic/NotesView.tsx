@@ -16,7 +16,7 @@ const MOCK_STEPS = [
 ];
 
 const REAL_STEPS = [
-  "Sending to Claude…",
+  "Sending to StudyOS…",
   "Structuring sections…",
   "Generating key points and formulas…",
   "Validating output…",
@@ -187,7 +187,7 @@ export function NotesView({
             )}
             {USE_REAL_API && !wasCached && (
               <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
-                Live · Claude
+                Live · StudyOS
               </span>
             )}
           </div>

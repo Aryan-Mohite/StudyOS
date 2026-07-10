@@ -36,14 +36,14 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* Auth — Phase 1: hardcoded nav; Clerk re-added in Phase 4 */}
+        {/* Auth */}
         <div className="flex items-center gap-2">
-          <Link href="/dashboard">
+          <Link href="/sign-in">
             <Button variant="outline" size="sm">
               Sign in
             </Button>
           </Link>
-          <Link href="/upload">
+          <Link href="/sign-up">
             <Button size="sm">
               Get started <ArrowRight size={13} />
             </Button>

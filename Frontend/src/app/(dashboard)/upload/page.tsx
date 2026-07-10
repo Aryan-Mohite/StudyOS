@@ -130,7 +130,7 @@ export default function UploadPage() {
         </p>
         {USE_REAL_API && (
           <span className="mt-2 inline-block rounded-full bg-brand-50 border border-brand-200 px-3 py-0.5 text-[11px] font-semibold text-brand-600">
-            Live mode · Claude will parse your PDF
+            Live mode · StudyOS will parse your PDF
           </span>
         )}
       </div>
@@ -189,7 +189,7 @@ export default function UploadPage() {
 
           <Button size="lg" className="w-full" disabled={state !== "file_selected"} onClick={handleUpload}>
             <Upload size={16} />
-            {USE_REAL_API ? "Upload & Analyse with Claude" : "Analyse Syllabus (mock)"}
+            {USE_REAL_API ? "Upload & Analyse with StudyOS" : "Analyse Syllabus (mock)"}
           </Button>
           <p className="text-center text-xs text-gray-400">
             Works with SPPU, Mumbai University, VTU, GTU, Anna University, and more
@@ -219,7 +219,7 @@ export default function UploadPage() {
             <div>
               <p className="font-medium text-gray-800">Analysing your syllabus…</p>
               <p className="mt-1 text-xs text-gray-400">
-                {USE_REAL_API ? "Claude is reading your PDF (~30 seconds)" : "~5 seconds"}
+                {USE_REAL_API ? "StudyOS is reading your PDF (~30 seconds)" : "~5 seconds"}
               </p>
             </div>
             <div className="flex w-full flex-col items-start gap-2 text-left">

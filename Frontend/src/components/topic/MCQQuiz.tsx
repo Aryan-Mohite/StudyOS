@@ -10,7 +10,7 @@ import { ErrorState, StaleWarning, IdleGenerateCard } from "@/components/shared/
 import { Button } from "@/components/ui/button";
 
 const MOCK_STEPS = ["Writing question stems…", "Crafting plausible distractors…", "Adding explanations…"];
-const REAL_STEPS = ["Sending to Claude…", "Writing question stems…", "Crafting plausible distractors…", "Validating output…"];
+const REAL_STEPS = ["Sending to StudyOS…", "Writing question stems…", "Crafting plausible distractors…", "Validating output…"];
 const OPTIONS: MCQOption[] = ["A", "B", "C", "D"];
 
 const DIFFICULTY_STYLE: Record<string, string> = {
@@ -233,7 +233,7 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
             )}
             {currentIndex === 0 && !isAnswered && USE_REAL_API && !wasCached && (
               <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
-                Live · Claude
+                Live · StudyOS
               </span>
             )}
           </div>
