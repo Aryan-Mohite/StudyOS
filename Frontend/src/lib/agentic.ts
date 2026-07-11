@@ -45,8 +45,9 @@ export async function parseSyllabus(file: File): Promise<unknown> {
   const res = await fetch(`${AGENTIC}/agent/parse-syllabus`, {
     method: "POST",
     body: form,
-    // 60s budget for PDF parsing + Claude call
-    signal: AbortSignal.timeout(60_000),
+    // 180s budget: covers the OCR fallback path (several seconds/page for
+    // scanned PDFs, up to 40 pages) plus the LLM parse call.
+    signal: AbortSignal.timeout(180_000),
   });
   return handle(res);
 }

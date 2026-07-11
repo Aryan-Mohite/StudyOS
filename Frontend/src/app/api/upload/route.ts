@@ -52,6 +52,12 @@ export async function POST(req: NextRequest) {
     if (err instanceof AgenticError) {
       return NextResponse.json({ detail: err.detail }, { status: err.status || 502 });
     }
+    // TEMP DEBUG: "fetch failed" hides the real cause (ECONNREFUSED, proxy
+    // interference, DNS, etc.) inside err.cause. Log it to find the real issue.
+    console.error("Upload failed — full error:", err);
+    if (err instanceof Error && "cause" in err) {
+      console.error("Upload failed — cause:", err.cause);
+    }
     const detail = err instanceof Error ? err.message : "Syllabus parsing failed.";
     return NextResponse.json({ detail }, { status: 502 });
   }

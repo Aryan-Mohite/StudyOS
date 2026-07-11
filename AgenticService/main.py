@@ -14,6 +14,7 @@ import os
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -72,7 +73,10 @@ async def agent_parse_syllabus(
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        raw_text = extract_pdf_text(raw_bytes)
+        # extract_pdf_text is a blocking, CPU-bound call (pdfplumber/PyMuPDF,
+        # and worst case per-page Tesseract OCR) — run it in a worker thread
+        # so it doesn't block the event loop for other requests while it runs.
+        raw_text = await run_in_threadpool(extract_pdf_text, raw_bytes)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"PDF text extraction failed: {exc}") from exc
 

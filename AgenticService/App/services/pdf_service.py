@@ -46,7 +46,7 @@ def _extract_with_pymupdf(file_bytes: bytes) -> str:
     return "\n\n".join(text_pages)
 
 
-def _extract_with_ocr(file_bytes: bytes, max_pages: int = 40) -> str:
+def _extract_with_ocr(file_bytes: bytes, max_pages: int = 15) -> str:
     """Render each page to an image with PyMuPDF and OCR it with Tesseract.
 
     This is the last resort for genuinely scanned PDFs (photographed or
