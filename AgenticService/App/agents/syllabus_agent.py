@@ -1,7 +1,8 @@
 """
 syllabus_agent.py — Parses raw syllabus text into the structured syllabus
-contract via Claude (through llm_service). Pure agent logic; the LangGraph
-wrapper lives in App/workflows/syllabus_workflow.py.
+contract via Claude (through llm_service). Also exposes run_syllabus_parse,
+the entry point called directly by main.py (no LangGraph wrapper — see
+App/workflows/README.md for why).
 """
 
 import uuid
@@ -49,3 +50,14 @@ def parse_syllabus(raw_text: str, filename: str) -> dict:
 
     parsed = call_llm_json(_load_prompt(), user_prompt, max_tokens=4096)
     return _inject_ids(parsed)
+
+
+def run_syllabus_parse(raw_text: str, filename: str) -> dict:
+    """Entry point used by main.py. Raises ValueError on failure.
+
+    Previously wrapped in a single-node LangGraph StateGraph purely for
+    architectural symmetry with the genuinely multi-step graphs (notes,
+    tutor). There was no branching here, so that wrapper was removed —
+    this function IS the parse step.
+    """
+    return parse_syllabus(raw_text, filename)

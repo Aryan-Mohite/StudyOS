@@ -106,3 +106,28 @@ Return the JSON MCQ set object."""
 
     validated = MCQResponse.model_validate(raw)
     return validated.model_dump()
+
+
+def run_mcq_generation(
+    topic_name: str,
+    subject: str,
+    topic_id: str,
+    count: int,
+    difficulty: str,
+    syllabus_context: list[str],
+) -> dict:
+    """Entry point used by main.py. Raises ValueError on failure.
+
+    Previously wrapped in a single-node LangGraph StateGraph purely for
+    architectural symmetry with the genuinely multi-step graphs (notes,
+    tutor). There was no branching here, so that wrapper was removed —
+    this function IS the generation step.
+    """
+    return generate_mcq(
+        topic_name=topic_name,
+        subject=subject,
+        topic_id=topic_id,
+        count=count,
+        difficulty=difficulty,
+        syllabus_context=syllabus_context,
+    )
