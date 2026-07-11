@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { Upload, Calendar, BookOpen, ArrowRight, Beaker, FileUp } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
-import { SyllabusTree } from "@/components/dashboard/SyllabusTree";
+import { SyllabusTree } from "@/components/SyllabusTree";
 import { Button } from "@/components/ui/button";
-import { mockSyllabus } from "@/mocks";
 import { getPool, initDb } from "@/lib/db";
-import { USE_REAL_API } from "@/lib/flags";
 import type { RowDataPacket } from "mysql2";
 import type { Syllabus, SyllabusSubject } from "@/types";
 
@@ -25,9 +23,7 @@ async function fetchLatestSyllabus(): Promise<Syllabus | null> {
 }
 
 export default async function DashboardPage() {
-  // Live mode: use the real, per-user syllabus. Falls back to mock data
-  // (and never touches MySQL) when NEXT_PUBLIC_USE_REAL_API is off.
-  const syllabus = USE_REAL_API ? await fetchLatestSyllabus() : mockSyllabus;
+  const syllabus = await fetchLatestSyllabus();
 
   if (!syllabus) {
     return (
@@ -88,7 +84,7 @@ export default async function DashboardPage() {
           {[
             { label: "Total Topics", value: totalTopics, sub: "across all subjects" },
             { label: "Numericals", value: totalWithNumericals, sub: "topics with solved problems" },
-            { label: "Days to Exam", value: 45, sub: "Nov 15, 2024" },
+            { label: "Subjects", value: syllabus.subjects.length, sub: syllabus.university },
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-border bg-surface p-4">
               <p className="font-display text-2xl font-bold text-brand-500">{stat.value}</p>
@@ -105,7 +101,7 @@ export default async function DashboardPage() {
               <Calendar size={18} className="text-brand-500" />
             </div>
             <h3 className="text-[14px] font-semibold text-gray-900">Study Plan</h3>
-            <p className="mt-1 text-[12px] text-gray-500">30-day plan ready · Exam Nov 15</p>
+            <p className="mt-1 text-[12px] text-gray-500">Generate a day-by-day schedule</p>
             <span className="mt-3 flex items-center gap-1 text-[12px] font-medium text-brand-500 group-hover:gap-2 transition-all">
               Open plan <ArrowRight size={12} />
             </span>

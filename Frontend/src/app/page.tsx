@@ -1,8 +1,8 @@
-import { Navbar }   from "@/components/layout/Navbar";
-import { Footer }   from "@/components/layout/Footer";
-import { Hero }     from "@/components/landing/Hero";
-import { Features } from "@/components/landing/Features";
-import { CTA }      from "@/components/landing/CTA";
+import { Navbar }   from "@/components/Navbar";
+import { Footer }   from "@/components/Footer";
+import { Hero }     from "@/components/Hero";
+import { Features } from "@/components/Features";
+import { CTA }      from "@/components/CTA";
 
 export default function HomePage() {
   return (

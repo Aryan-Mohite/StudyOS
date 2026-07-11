@@ -2,14 +2,11 @@
 import { useState } from "react";
 import { HelpCircle, CheckCircle2, XCircle, RotateCcw, Trophy, Zap } from "lucide-react";
 import type { MCQSet, MCQOption, MCQState } from "@/types";
-import { mockGenerateMCQ, type StepCallback } from "@/lib/mock-api";
 import { generateMCQ, deleteMCQ, APIError } from "@/lib/api";
-import { USE_REAL_API } from "@/lib/flags";
-import { LoadingSteps } from "@/components/shared/LoadingSteps";
-import { ErrorState, StaleWarning, IdleGenerateCard } from "@/components/shared/StateComponents";
+import { LoadingSteps } from "@/components/LoadingSteps";
+import { ErrorState, StaleWarning, IdleGenerateCard } from "@/components/StateComponents";
 import { Button } from "@/components/ui/button";
 
-const MOCK_STEPS = ["Writing question stems…", "Crafting plausible distractors…", "Adding explanations…"];
 const REAL_STEPS = ["Sending to StudyOS…", "Writing question stems…", "Crafting plausible distractors…", "Validating output…"];
 const OPTIONS: MCQOption[] = ["A", "B", "C", "D"];
 
@@ -44,14 +41,6 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
     setAnswers({});
     setError(null);
 
-    if (USE_REAL_API) {
-      await generateReal(forceRegenerate);
-    } else {
-      await generateMock();
-    }
-  };
-
-  const generateReal = async (forceRegenerate: boolean) => {
     const steps = REAL_STEPS;
     let stepIdx = 0;
     setCurrentStep(steps[0]);
@@ -92,33 +81,9 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
     }
   };
 
-  const generateMock = async () => {
-    const steps = MOCK_STEPS;
-    const onStep: StepCallback = (step) => {
-      setCurrentStep(step);
-      const idx = steps.indexOf(step);
-      setCompletedSteps(steps.slice(0, idx));
-    };
-    try {
-      const result = await mockGenerateMCQ(topicId, onStep);
-      if (!result) {
-        setStatus("empty");
-      } else {
-        setWasCached(false);
-        setData(result);
-        setStatus("in_progress");
-      }
-    } catch {
-      setError("Quiz generation failed. Please try again.");
-      setStatus("error");
-    }
-  };
-
   const handleRegenerate = async () => {
-    if (USE_REAL_API) {
-      // Delete cache first so a stale syllabus produces genuinely new questions
-      try { await deleteMCQ(topicId); } catch { /* ignore if not cached */ }
-    }
+    // Delete cache first so a stale syllabus produces genuinely new questions
+    try { await deleteMCQ(topicId); } catch { /* ignore if not cached */ }
     await generate(true);
   };
 
@@ -150,7 +115,7 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
       <IdleGenerateCard
         label="Start Quiz"
         description={`${topicName} — 10 questions, mix of easy, medium, and hard.`}
-        estimatedTime={USE_REAL_API ? "~15–25 seconds" : "~2 seconds (mock)"}
+        estimatedTime="~15–25 seconds"
         onGenerate={() => generate()}
         icon={<HelpCircle size={22} />}
       />
@@ -162,7 +127,7 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
       <LoadingSteps
         currentStep={currentStep}
         completedSteps={completedSteps}
-        estimatedSeconds={USE_REAL_API ? 20 : 2}
+        estimatedSeconds={20}
       />
     );
   }
@@ -231,7 +196,7 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
                 <Zap size={9} /> Instant (cached)
               </span>
             )}
-            {currentIndex === 0 && !isAnswered && USE_REAL_API && !wasCached && (
+            {currentIndex === 0 && !isAnswered && !wasCached && (
               <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
                 Live · StudyOS
               </span>

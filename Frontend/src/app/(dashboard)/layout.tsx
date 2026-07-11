@@ -1,4 +1,4 @@
-import { AppNavbar } from "@/components/dashboard/AppNavbar";
+import { AppNavbar } from "@/components/AppNavbar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (

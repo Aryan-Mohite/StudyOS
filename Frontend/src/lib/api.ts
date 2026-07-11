@@ -7,9 +7,6 @@
  *
  * Set NEXT_PUBLIC_API_URL in .env.local only if you ever split the API
  * routes into a separately-deployed service (default: same origin, "").
- * Set NEXT_PUBLIC_USE_REAL_API=true to activate real API calls.
- *
- * When USE_REAL_API is false (or unset), components fall back to mock-api.ts.
  */
 
 import type { Syllabus, Note, MCQSet, NumericalSet, TutorResponse, ChatMessage } from "@/types";

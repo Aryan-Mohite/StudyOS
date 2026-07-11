@@ -3,9 +3,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, File, CheckCircle2, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { mockUploadSyllabus } from "@/lib/mock-api";
 import { uploadSyllabus, APIError } from "@/lib/api";
-import { USE_REAL_API } from "@/lib/flags";
 import type { SyllabusUploadState } from "@/types";
 
 const PARSE_STEPS = [
@@ -68,11 +66,7 @@ export default function UploadPage() {
     setCompletedSteps([]);
 
     try {
-      if (USE_REAL_API) {
-        await runRealUpload(file);
-      } else {
-        await runMockUpload(file);
-      }
+      await runRealUpload(file);
       setState("success");
       setTimeout(() => router.push("/dashboard"), 1200);
     } catch (err) {
@@ -104,14 +98,6 @@ export default function UploadPage() {
     }
   };
 
-  const runMockUpload = async (f: File) => {
-    await mockUploadSyllabus(f, (step) => {
-      setCurrentStep(step);
-      const idx = PARSE_STEPS.indexOf(step);
-      setCompletedSteps(PARSE_STEPS.slice(0, idx));
-    });
-  };
-
   const reset = () => {
     setState("idle");
     setFile(null);
@@ -128,11 +114,9 @@ export default function UploadPage() {
           PDF from your university portal, class notes, or course outline.
           We&apos;ll extract the full subject and topic structure.
         </p>
-        {USE_REAL_API && (
-          <span className="mt-2 inline-block rounded-full bg-brand-50 border border-brand-200 px-3 py-0.5 text-[11px] font-semibold text-brand-600">
-            Live mode · StudyOS will parse your PDF
-          </span>
-        )}
+        <span className="mt-2 inline-block rounded-full bg-brand-50 border border-brand-200 px-3 py-0.5 text-[11px] font-semibold text-brand-600">
+          StudyOS will parse your PDF
+        </span>
       </div>
 
       {/* ── Idle / File selected / Format error ─────────────── */}
@@ -189,7 +173,7 @@ export default function UploadPage() {
 
           <Button size="lg" className="w-full" disabled={state !== "file_selected"} onClick={handleUpload}>
             <Upload size={16} />
-            {USE_REAL_API ? "Upload & Analyse with StudyOS" : "Analyse Syllabus (mock)"}
+            {"Upload & Analyse"}
           </Button>
           <p className="text-center text-xs text-gray-400">
             Works with SPPU, Mumbai University, VTU, GTU, Anna University, and more
@@ -219,7 +203,7 @@ export default function UploadPage() {
             <div>
               <p className="font-medium text-gray-800">Analysing your syllabus…</p>
               <p className="mt-1 text-xs text-gray-400">
-                {USE_REAL_API ? "StudyOS is reading your PDF (~30 seconds)" : "~5 seconds"}
+                {"StudyOS is reading your PDF (~30 seconds)"}
               </p>
             </div>
             <div className="flex w-full flex-col items-start gap-2 text-left">

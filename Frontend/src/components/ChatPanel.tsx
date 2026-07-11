@@ -1,10 +1,14 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Send, MessageSquare, Bot, User } from "lucide-react";
-import type { ChatMessage, TutorResponse } from "@/types";
-import { mockChat, getSuggestedQuestions } from "@/lib/mock-api";
+import type { TutorResponse } from "@/types";
 import { sendChatMessage, APIError } from "@/lib/api";
-import { USE_REAL_API } from "@/lib/flags";
+
+const DEFAULT_SUGGESTIONS = [
+  "Summarise the most important topics in this chapter",
+  "What are the common exam questions from this topic?",
+  "Explain the key formula and when to use it",
+];
 
 interface ChatPanelProps {
   topicId: string | null;
@@ -26,7 +30,7 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [] }:
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const suggested = getSuggestedQuestions(topicId);
+  const suggested = DEFAULT_SUGGESTIONS;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,22 +44,16 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [] }:
     setIsLoading(true);
 
     try {
-      let response: TutorResponse;
-      if (USE_REAL_API) {
-        response = await sendChatMessage({
-          // Placeholder — the API route derives the real session_id
-          // server-side from the authenticated Clerk user + topicId.
-          session_id: `pending:${topicId}`,
-          question: text.trim(),
-          topic_id: topicId,
-          topic_name: topicName,
-          subject: subject ?? "",
-          syllabus_context: syllabusContext,
-        });
-      } else {
-        const history: ChatMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
-        response = await mockChat([...history, { role: "user", content: text.trim() }], topicId);
-      }
+      const response: TutorResponse = await sendChatMessage({
+        // Placeholder — the API route derives the real session_id
+        // server-side from the authenticated Clerk user + topicId.
+        session_id: `pending:${topicId}`,
+        question: text.trim(),
+        topic_id: topicId,
+        topic_name: topicName,
+        subject: subject ?? "",
+        syllabus_context: syllabusContext,
+      });
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: response.answer, isOutOfScope: response.out_of_scope },

@@ -2,18 +2,9 @@
 import { useState } from "react";
 import { FileText, ChevronRight, Zap } from "lucide-react";
 import type { Note, NotesState } from "@/types";
-import { mockGenerateNotes, type StepCallback } from "@/lib/mock-api";
 import { generateNotes, deleteNotes, APIError } from "@/lib/api";
-import { USE_REAL_API } from "@/lib/flags";
-import { LoadingSteps } from "@/components/shared/LoadingSteps";
-import { EmptyState, ErrorState, StaleWarning, FormulaBlock, IdleGenerateCard } from "@/components/shared/StateComponents";
-
-const MOCK_STEPS = [
-  "Reading your syllabus context…",
-  "Structuring key sections…",
-  "Adding formulas and key points…",
-  "Linking related topics…",
-];
+import { LoadingSteps } from "@/components/LoadingSteps";
+import { EmptyState, ErrorState, StaleWarning, FormulaBlock, IdleGenerateCard } from "@/components/StateComponents";
 
 const REAL_STEPS = [
   "Sending to StudyOS…",
@@ -53,14 +44,6 @@ export function NotesView({
     setCompletedSteps([]);
     setError(null);
 
-    if (USE_REAL_API) {
-      await generateReal(forceRegenerate);
-    } else {
-      await generateMock();
-    }
-  };
-
-  const generateReal = async (forceRegenerate: boolean) => {
     const steps = REAL_STEPS;
     // Animate steps while waiting for the API (it takes 10–25 s)
     let stepIdx = 0;
@@ -100,30 +83,9 @@ export function NotesView({
     }
   };
 
-  const generateMock = async () => {
-    const steps = MOCK_STEPS;
-    const onStep: StepCallback = (step) => {
-      setCurrentStep(step);
-      const idx = steps.indexOf(step);
-      setCompletedSteps(steps.slice(0, idx));
-    };
-    try {
-      const result = await mockGenerateNotes(topicId, onStep);
-      if (!result) { setStatus("empty"); return; }
-      setWasCached(false);
-      setData(result);
-      setStatus("success");
-    } catch {
-      setError("Notes generation failed. Please try again.");
-      setStatus("error");
-    }
-  };
-
   const handleRegenerate = async () => {
-    if (USE_REAL_API) {
-      // Delete cache first, then regenerate
-      try { await deleteNotes(topicId); } catch { /* ignore if not cached */ }
-    }
+    // Delete cache first, then regenerate
+    try { await deleteNotes(topicId); } catch { /* ignore if not cached */ }
     await generate(true);
   };
 
@@ -134,7 +96,7 @@ export function NotesView({
       <IdleGenerateCard
         label="Generate Notes"
         description={`AI-structured notes for "${topicName}" — sections, formulas, and key points.`}
-        estimatedTime={USE_REAL_API ? "~20–30 seconds" : "~3 seconds (mock)"}
+        estimatedTime="~20–30 seconds"
         onGenerate={() => generate()}
         icon={<FileText size={22} />}
       />
@@ -146,7 +108,7 @@ export function NotesView({
       <LoadingSteps
         currentStep={currentStep}
         completedSteps={completedSteps}
-        estimatedSeconds={USE_REAL_API ? 25 : 3}
+        estimatedSeconds={25}
       />
     );
   }
@@ -185,7 +147,7 @@ export function NotesView({
                 <Zap size={9} /> Instant (cached)
               </span>
             )}
-            {USE_REAL_API && !wasCached && (
+            {!wasCached && (
               <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
                 Live · StudyOS
               </span>

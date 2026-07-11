@@ -70,6 +70,39 @@ is the one genuinely multi-step graph (retrieve → generate) with LangGraph's
 `AgenticService/MIGRATION_NOTES.md` for the full rationale and what's ported
 vs. newly built.
 
+## Frontend internals
+
+`Frontend/src/components/` is intentionally flat — there's no `dashboard/`,
+`landing/`, `layout/`, `shared/`, `topic/` subdivision. With ~14 components
+total, per-feature folders added navigation overhead without a real payoff.
+Only `components/ui/` (shadcn primitives) stays separate, since that's a
+different category of file (generated, rarely touched) rather than a
+different feature area.
+
+```
+Frontend/src/
+  app/                    ← Next.js App Router (routes + API route handlers)
+  components/
+    ui/                   ← shadcn primitives (button, card, badge)
+    Navbar.tsx             ← public landing navbar (app/page.tsx)
+    AppNavbar.tsx           ← authenticated app navbar ((dashboard) layout)
+    Footer.tsx, Hero.tsx, Features.tsx, CTA.tsx, Mockup.tsx  ← landing page
+    SyllabusTree.tsx        ← left-nav syllabus tree (dashboard + study page)
+    NotesView.tsx, NumericalsView.tsx, MCQQuiz.tsx, ChatPanel.tsx  ← topic tabs
+    LoadingSteps.tsx, StateComponents.tsx  ← shared idle/loading/error/empty UI
+  lib/                    ← api.ts (API client), db.ts, agentic.ts, utils.ts
+  types/                  ← shared TypeScript contracts
+```
+
+Note there are two navbars by design, not by accident: `Navbar.tsx` is the
+signed-out marketing navbar shown on `/`, `AppNavbar.tsx` is the signed-in
+app navbar (with `<UserButton/>`) shown inside `(dashboard)/layout.tsx`.
+
+There is no `mocks/` folder and no `USE_REAL_API` flag — every feature
+(Notes, MCQ, Numericals, Tutor Chat) always calls the real API routes.
+Study Plan has no backend yet, so `/plan` shows an honest "coming soon"
+state rather than fake generated data.
+
 ## What changed from the original 3-layer design
 
 The original design had **Frontend → Express Gateway → AgenticService**, with
@@ -159,7 +192,6 @@ There is no separate gateway step anymore — Next.js *is* the gateway.
 |---|---|
 | `DATABASE_URL` | MySQL connection string, e.g. `mysql://user:pass@host:3306/studyos` |
 | `AGENTIC_SERVICE_URL` | URL of the FastAPI service. Server-side only — no `NEXT_PUBLIC_` prefix |
-| `NEXT_PUBLIC_USE_REAL_API` | `true` to use real API routes, `false` for mock data |
 | `NEXT_PUBLIC_API_URL` | Leave unset (defaults to same-origin `/api/*`). Only set if you split the API routes into a separate deployment later |
 
 ## API Routes (Next.js Route Handlers)
