@@ -7,15 +7,25 @@ wrapper here:
   (best-effort, non-blocking). Two real nodes.
 - **tutor_workflow.py** — retrieve (RAG context) → generate, with
   `MemorySaver` checkpointing per `session_id`. Two real nodes + memory.
+- **mcq_workflow.py** — generate → validate quality (duplicate concepts,
+  lopsided difficulty distribution, lazy explanations) → repair once if
+  issues are found. Real conditional edge, bounded to one repair attempt.
+- **numericals_workflow.py** — generate → validate quality (empty `given`,
+  placeholder answers, skipped derivation steps, lopsided difficulty) →
+  repair once if issues are found. Same shape as mcq_workflow.py.
 
-MCQ, Numericals, and Syllabus parsing are single LLM-call-in, JSON-out
-operations with no branching. They used to have their own single-node
-`StateGraph` wrappers (`mcq_workflow.py`, `numericals_workflow.py`,
-`syllabus_workflow.py`) that added ~70 lines of boilerplate each without
-doing anything a plain function call didn't already do. That logic now
-lives directly in `App/agents/{mcq,numericals,syllabus}_agent.py` as
-`run_mcq_generation`, `run_numericals_generation`, and `run_syllabus_parse`.
+Syllabus parsing is still a single LLM-call-in, JSON-out operation with no
+branching, so it stays a plain function: `App/agents/syllabus_agent.py`'s
+`run_syllabus_parse`.
 
-If one of these ever needs real branching (e.g. "re-parse on low
-confidence" for syllabus), promote it back to a `StateGraph` here — the
-call signature from `main.py` won't need to change either way.
+History: MCQ and Numericals used to be plain function calls too (an earlier
+single-node `StateGraph` wrapper for all three was removed for adding
+boilerplate without adding behavior — see git history). They were promoted
+back here once a real second node existed: a quality-validation pass with
+an actual conditional repair edge, not just architectural symmetry. Contract
+validation (Pydantic) still lives in `App/agents/`; the workflow only adds
+the "is this actually good, and can I fix it" loop on top.
+
+If syllabus parsing ever needs real branching (e.g. "re-parse on low
+confidence"), promote it back to a `StateGraph` here too — the call
+signature from `main.py` won't need to change either way.

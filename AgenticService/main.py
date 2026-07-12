@@ -3,11 +3,11 @@ main.py — StudyOS AgenticService
 Pure AI layer: PDF parsing, notes/MCQ/numericals generation, tutor chat.
 No database. No caching. That's the Express layer's job.
 
-Notes and Tutor Chat delegate to a LangGraph workflow in App/workflows/
-(genuine multi-step: generate+index, retrieve+generate). MCQ, Numericals,
-and Syllabus parsing call their agent in App/agents/ directly — see
-App/workflows/README.md for why. See ARCHITECTURE.md for the full request
-flow.
+Notes, Tutor Chat, MCQ, and Numericals all delegate to a LangGraph workflow
+in App/workflows/ (genuine multi-step: generate+index, retrieve+generate,
+generate+validate+repair). Syllabus parsing calls its agent in App/agents/
+directly — see App/workflows/README.md for why. See ARCHITECTURE.md for
+the full request flow.
 """
 
 import os
@@ -20,10 +20,10 @@ from pydantic import BaseModel
 
 from config import settings
 from App.services.pdf_service import extract_pdf_text
-from App.agents.mcq_agent import run_mcq_generation
-from App.agents.numericals_agent import run_numericals_generation
 from App.agents.syllabus_agent import run_syllabus_parse
+from App.workflows.mcq_workflow import run_mcq_generation
 from App.workflows.notes_workflow import run_notes_generation
+from App.workflows.numericals_workflow import run_numericals_generation
 from App.workflows.tutor_workflow import run_tutor_turn
 
 app = FastAPI(
