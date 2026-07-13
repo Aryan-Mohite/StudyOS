@@ -24,7 +24,9 @@ class NotesState(TypedDict):
     unit_title: str
     topic_id: str
     syllabus_id: Optional[str]
+    notebook_id: Optional[str]
     syllabus_context: list[str]
+    student_context: Optional[str]
     result: Optional[dict]
     error: Optional[str]
 
@@ -48,6 +50,7 @@ def _generate_node(state: NotesState) -> NotesState:
             topic_id=state["topic_id"],
             syllabus_context=state.get("syllabus_context", []),
             reference_context=reference_context,
+            student_context=state.get("student_context"),
         )
         return {**state, "result": result, "error": None}
     except ValueError as exc:
@@ -62,6 +65,7 @@ def _index_node(state: NotesState) -> NotesState:
                 subject=state["subject"],
                 topic_name=state["topic_name"],
                 note=state["result"],
+                notebook_id=state.get("notebook_id"),
             )
         except Exception:
             # Best-effort — RAG indexing failure must not fail notes generation.
@@ -93,6 +97,8 @@ def run_notes_generation(
     topic_id: str,
     syllabus_context: list[str],
     syllabus_id: Optional[str] = None,
+    student_context: Optional[str] = None,
+    notebook_id: Optional[str] = None,
 ) -> dict:
     """Entry point used by main.py. Raises ValueError on failure."""
     final_state = _GRAPH.invoke(
@@ -102,7 +108,9 @@ def run_notes_generation(
             "unit_title": unit_title,
             "topic_id": topic_id,
             "syllabus_id": syllabus_id,
+            "notebook_id": notebook_id,
             "syllabus_context": syllabus_context,
+            "student_context": student_context,
             "result": None,
             "error": None,
         }

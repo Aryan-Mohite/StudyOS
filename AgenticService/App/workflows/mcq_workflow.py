@@ -26,6 +26,7 @@ class MCQState(TypedDict):
     difficulty: str
     syllabus_id: Optional[str]
     syllabus_context: list[str]
+    student_context: Optional[str]
     result: Optional[dict]
     issues: list[str]
     retried: bool
@@ -52,6 +53,7 @@ def _generate_node(state: MCQState) -> MCQState:
             difficulty=state["difficulty"],
             syllabus_context=state.get("syllabus_context", []),
             reference_context=reference_context,
+            student_context=state.get("student_context"),
         )
         return {**state, "result": result, "error": None}
     except ValueError as exc:
@@ -111,6 +113,7 @@ def run_mcq_generation(
     difficulty: str,
     syllabus_context: list[str],
     syllabus_id: Optional[str] = None,
+    student_context: Optional[str] = None,
 ) -> dict:
     """Entry point used by main.py. Raises ValueError on failure."""
     final_state = _GRAPH.invoke(
@@ -122,6 +125,7 @@ def run_mcq_generation(
             "difficulty": difficulty,
             "syllabus_id": syllabus_id,
             "syllabus_context": syllabus_context,
+            "student_context": student_context,
             "result": None,
             "issues": [],
             "retried": False,

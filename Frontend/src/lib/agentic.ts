@@ -59,6 +59,8 @@ export interface GenerateNotesPayload {
   unit_title: string;
   syllabus_context: string[];
   syllabus_id?: string;
+  student_context?: string;
+  notebook_id?: string;
 }
 
 export async function generateNotes(
@@ -81,6 +83,7 @@ export interface GenerateMCQPayload {
   difficulty: string;
   syllabus_context: string[];
   syllabus_id?: string;
+  student_context?: string;
 }
 
 export async function generateMCQ(
@@ -103,6 +106,7 @@ export interface GenerateNumericalsPayload {
   difficulty: string;
   syllabus_context: string[];
   syllabus_id?: string;
+  student_context?: string;
 }
 
 export async function generateNumericals(
@@ -125,6 +129,7 @@ export interface TutorChatPayload {
   topic_name: string;
   subject: string;
   syllabus_context: string[];
+  notebook_id?: string;
 }
 
 export async function tutorChat(

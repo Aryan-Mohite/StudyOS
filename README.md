@@ -1,166 +1,63 @@
-# StudyOS
+# StudyOS — Profile + Auto-Notebooks + Per-Notebook RAG patch
 
-**AI-powered learning platform for Indian engineering students.**
+Supersedes the earlier `StudyOS-profile-notebooks.zip`. Apply by copying
+these files into your repo at the matching paths (overwrite existing files
+with the same name). Folder structure mirrors the repo, so you can extract
+straight over `StudyOS/`.
 
-Upload any university syllabus PDF → get structured notes, MCQs, solved numericals, a study plan, and an AI tutor — all scoped to your exact curriculum.
+## Part 1 — Profile (unchanged from previous drop)
+- `Frontend/src/lib/profile.ts`, `app/api/profile/route.ts`, `app/(dashboard)/profile/page.tsx`, `components/ProfileBadge.tsx`
+- `student_context` forwarded into Notes/MCQ/Numericals generation
 
----
+## Part 2 — Auto-notebooks (unchanged from previous drop)
+- `notebooks` table, `syllabi.notebook_id`, auto-created on every syllabus upload in `app/api/upload/route.ts`
 
-## Architecture
+## Part 3 — Per-notebook RAG namespacing (new this drop)
 
-```
-┌───────────────────────────────┐
-│   Next.js (UI + API Routes)  │  ← Your browser + server, deployed on Vercel
-└──────────────┬─────────────────┘
-               │ HTTPS (server-side only)
-               ▼
-┌───────────────────────────────┐
-│  Python AgenticService        │  ← Claude API, PDF parsing, Pydantic
-│  Deployed on Railway/Render   │
-└──────────────┬─────────────────┘
-               │
-        (no DB connection)
+This is what makes Tutor Chat and Notes indexing subject-aware instead of
+pooling every student's every subject into one global vector collection.
 
-┌───────────────────────────────┐
-│  MySQL                        │  ← Used only by Next.js
-│  PlanetScale / Railway / Aiven│
-└───────────────────────────────┘
-```
+**`AgenticService/App/services/rag_service.py`**
+- `index_note()` and `retrieve_context()` now accept an optional `notebook_id`
+- Collection name becomes `studyos_notes_{notebook_id}` when given
+- No `notebook_id` → falls back to the original single `studyos_notes` collection, so nothing indexed before this patch is orphaned
 
-The old Express gateway has been merged into Next.js Route Handlers, and the
-cache layer moved from file-based SQLite to hosted MySQL — this gives a
-**2-service deploy** (Vercel + Railway/Render) instead of three, with no
-behavior changes. See [ARCHITECTURE.md](./ARCHITECTURE.md) for full details
-on what changed and why.
+**`AgenticService/App/workflows/notes_workflow.py`**
+- `notebook_id` threaded through `NotesState` → passed to `index_note()` after generation
 
----
+**`AgenticService/App/workflows/tutor_workflow.py`**
+- `notebook_id` threaded through `TutorState` → passed to `retrieve_context()` before generation
 
-## Quick Start
+**`AgenticService/main.py`**
+- `NotesRequest` gains `notebook_id: Optional[str]`
+- `TutorRequest` gains `notebook_id: Optional[str]`
+- Both endpoints pass it straight through to their workflow entry point
+- (Left off `MCQRequest`/`NumericalsRequest` — those don't write to or read from the notes vector store, so it'd be a dead field)
 
-### Prerequisites
-- Node.js 18+
-- Python 3.11+
-- A MySQL database (local install, or a free PlanetScale/Railway/Aiven instance)
-- An Anthropic API key (`sk-ant-...`)
+**Frontend**
+- `lib/db.ts` — new `getNotebookIdForSyllabus(syllabusId)` helper (simple `syllabi` lookup)
+- `lib/agentic.ts` — `notebook_id` added to `GenerateNotesPayload` and `TutorChatPayload`
+- `app/api/notes/generate/route.ts` — resolves `notebook_id` from the request's `syllabus_id` and forwards it
+- `app/api/chat/route.ts` — now accepts `syllabus_id` in the request body, resolves `notebook_id`, forwards it
+- `lib/api.ts` — `SendChatMessageInput` gains optional `syllabus_id`
+- `components/ChatPanel.tsx` — gains `syllabusId` prop, includes it in the chat request
+- `app/(dashboard)/study/[topicId]/page.tsx` — passes `syllabus?.syllabus_id` into `ChatPanel`
 
-### 1. MySQL
+### Net effect
+Once a student uploads Syllabus A (Data Structures) and Syllabus B
+(Thermodynamics), each gets its own notebook and its own Chroma collection.
+Tutor Chat opened from a Data Structures topic only ever retrieves notes
+generated within that notebook — it can no longer surface Thermodynamics
+content (or another student's content, since collections are per-notebook,
+not just per-subject-name).
 
-Create an empty database — tables are created automatically on first request:
+### Not included in this patch
+- Reference-PDF upload endpoint (`POST /api/notebooks/{id}/sources`) and notebook list/switch UI — still the next phase
+- Migration of any pre-existing global-collection embeddings into a notebook-scoped collection — not needed since there are no real users yet
 
-```sql
-CREATE DATABASE studyos;
-```
+## Verified
+- `npx tsc --noEmit` — clean, no type errors
+- All modified `.py` files — `python3 -m py_compile` clean
 
-### 2. AgenticService (Python / Claude)
-
-```bash
-cd AgenticService
-cp .env.example .env
-# Add your ANTHROPIC_API_KEY to .env
-
-pip install -r requirements.txt
-python main.py
-# Running on http://localhost:8000
-```
-
-### 3. Frontend (Next.js — UI + API routes)
-
-```bash
-cd Frontend
-cp .env.local.example .env.local
-# Add DATABASE_URL (MySQL connection string) and AGENTIC_SERVICE_URL
-
-npm install
-npm run dev
-# Running on http://localhost:3000
-```
-
-Open http://localhost:3000 — upload a syllabus PDF and start studying.
-
-There is no separate gateway step anymore — Next.js's own API routes
-(`src/app/api/**`) do what `Backend-Express` used to do.
-
----
-
-## Toggle Real vs Mock API
-
-In `Frontend/.env.local`:
-
-```env
-# Use the real API routes (Next.js -> FastAPI -> MySQL)
-NEXT_PUBLIC_USE_REAL_API=true
-
-# OR use mock data (no backend required)
-NEXT_PUBLIC_USE_REAL_API=false
-```
-
-`NEXT_PUBLIC_API_URL` is no longer needed in normal use — the API routes are
-same-origin now. Only set it if you split the API routes into a separately
-deployed service later.
-
----
-
-## Deployment
-
-| Service | Platform | Notes |
-|---|---|---|
-| Next.js (UI + API) | **Vercel** | Connect the repo, set `DATABASE_URL` and `AGENTIC_SERVICE_URL` as env vars, deploy |
-| AgenticService | **Railway** or **Render** | Uses the included `Dockerfile` (or `Procfile`); set `ANTHROPIC_API_KEY` and `ALLOWED_ORIGINS` (your Vercel URL) |
-| MySQL | **PlanetScale**, **Railway**, or **Aiven** | Copy the connection string into `DATABASE_URL` on Vercel |
-
----
-
-## Project Structure
-
-```
-StudyOS/
-├── Frontend/                  # Next.js 15 + TypeScript + Tailwind
-│   └── src/
-│       ├── app/
-│       │   ├── api/           # Route Handlers — replaces Backend-Express
-│       │   │   ├── upload/
-│       │   │   ├── notes/
-│       │   │   ├── mcq/
-│       │   │   └── health/
-│       │   └── ...            # Next.js App Router pages
-│       ├── components/        # UI components (landing, dashboard, topic)
-│       ├── lib/
-│       │   ├── api.ts         # Client used by components (same-origin fetch)
-│       │   ├── db.ts          # MySQL pool + schema (replaces db.js)
-│       │   ├── agentic.ts     # Server-side AgenticService client (replaces axios calls)
-│       │   ├── flags.ts
-│       │   └── mock-api.ts
-│       ├── mocks/              # Realistic mock data (Phase 1)
-│       └── types/              # Contract types shared with AgenticService
-│
-├── AgenticService/             # Python FastAPI (AI-only, internal)
-│   ├── main.py                 # FastAPI app
-│   ├── config.py               # Settings from .env
-│   ├── Dockerfile              # For Railway/Render
-│   ├── Procfile                # Alternative to Dockerfile
-│   ├── services/
-│   │   ├── llm.py              # Claude API wrapper + JSON extraction
-│   │   ├── pdf_parser.py       # pdfplumber + syllabus parsing
-│   │   ├── notes_service.py    # Notes generation + Pydantic validation
-│   │   └── mcq_service.py      # MCQ generation + Pydantic validation
-│   └── prompts/                # LLM prompt files
-│       ├── notes_generator.md
-│       ├── mcq_generator.md
-│       └── syllabus_parser.md
-│
-└── ARCHITECTURE.md             # Detailed architecture decisions
-```
-
----
-
-## Roadmap
-
-- [x] Phase 1 — Full UI on mock data
-- [x] Phase 2 — Notes feature end-to-end
-- [x] Phase 3 (partial) — MCQ Generator
-- [x] Tech stack migration — Express+SQLite → Next.js API routes+MySQL
-- [ ] Phase 3 — Solved Numericals
-- [ ] Phase 3 — AI Tutor Chat
-- [ ] Phase 3 — Study Plan Generator
-- [ ] Phase 4 — Infrastructure (auth, scaling)
-- [ ] Phase 5 — Real user testing
+## Still pending (per your call — you'll test manually)
+- Real end-to-end RAG run: upload two syllabi, confirm Tutor Chat for one doesn't leak into the other's retrieved context

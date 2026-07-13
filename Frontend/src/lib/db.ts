@@ -40,14 +40,33 @@ export function getPool(): mysql.Pool {
 }
 
 const CREATE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS user_profile (
+  user_id          VARCHAR(128) PRIMARY KEY,
+  name             VARCHAR(255),
+  education_level  VARCHAR(100),
+  course           VARCHAR(100),
+  university       VARCHAR(100),
+  updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS notebooks (
+  id           VARCHAR(64) PRIMARY KEY,
+  user_id      VARCHAR(128) NOT NULL,
+  subject_name VARCHAR(255),
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_notebooks_user (user_id)
+);
+
 CREATE TABLE IF NOT EXISTS syllabi (
   id           VARCHAR(64) PRIMARY KEY,
   user_id      VARCHAR(128) NOT NULL DEFAULT 'dev-user-01',
+  notebook_id  VARCHAR(64),
   filename     VARCHAR(512),
   raw_text     LONGTEXT,
   parsed_json  LONGTEXT NOT NULL,
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_syllabi_user (user_id)
+  INDEX idx_syllabi_user (user_id),
+  INDEX idx_syllabi_notebook (notebook_id)
 );
 
 CREATE TABLE IF NOT EXISTS notes (
@@ -102,4 +121,21 @@ export async function initDb(): Promise<void> {
     await pool.query(stmt);
   }
   _initialized = true;
+}
+
+/**
+ * Looks up the notebook a syllabus belongs to (every syllabus auto-creates
+ * one on upload). Returns null if the syllabus is unknown or predates the
+ * notebooks feature — callers should treat that as "use the legacy global
+ * RAG collection" rather than an error.
+ */
+export async function getNotebookIdForSyllabus(syllabusId: string): Promise<string | null> {
+  await initDb();
+  const pool = getPool();
+  const [rows] = await pool.query(
+    `SELECT notebook_id FROM syllabi WHERE id = ? LIMIT 1`,
+    [syllabusId],
+  );
+  const row = (rows as Array<{ notebook_id: string | null }>)[0];
+  return row?.notebook_id ?? null;
 }

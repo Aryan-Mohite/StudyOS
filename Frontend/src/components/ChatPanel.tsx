@@ -15,6 +15,7 @@ interface ChatPanelProps {
   topicName: string | null;
   subject?: string;
   syllabusContext?: string[];
+  syllabusId?: string;
 }
 
 interface DisplayMessage {
@@ -23,7 +24,7 @@ interface DisplayMessage {
   isOutOfScope?: boolean;
 }
 
-export function ChatPanel({ topicId, topicName, subject, syllabusContext = [] }: ChatPanelProps) {
+export function ChatPanel({ topicId, topicName, subject, syllabusContext = [], syllabusId }: ChatPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +54,7 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [] }:
         topic_name: topicName,
         subject: subject ?? "",
         syllabus_context: syllabusContext,
+        syllabus_id: syllabusId,
       });
       setMessages((prev) => [
         ...prev,

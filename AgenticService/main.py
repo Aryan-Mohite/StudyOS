@@ -135,6 +135,8 @@ class NotesRequest(BaseModel):
     unit_title: str
     syllabus_context: list[str] = []
     syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
+    student_context: Optional[str] = None  # one-line profile summary, e.g. "B.Tech 2nd Year, CS, SPPU"
+    notebook_id: Optional[str] = None  # scopes generated-notes RAG indexing to this notebook
 
 
 @app.post("/agent/generate-notes")
@@ -148,6 +150,8 @@ async def agent_generate_notes(req: NotesRequest):
             topic_id=req.topic_id,
             syllabus_context=req.syllabus_context,
             syllabus_id=req.syllabus_id,
+            student_context=req.student_context,
+            notebook_id=req.notebook_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Notes generation failed: {exc}") from exc
@@ -163,6 +167,7 @@ class MCQRequest(BaseModel):
     difficulty: str = "mixed"
     syllabus_context: list[str] = []
     syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
+    student_context: Optional[str] = None  # one-line profile summary, e.g. "B.Tech 2nd Year, CS, SPPU"
 
 
 @app.post("/agent/generate-mcq")
@@ -176,6 +181,7 @@ async def agent_generate_mcq(req: MCQRequest):
             difficulty=req.difficulty,
             syllabus_context=req.syllabus_context,
             syllabus_id=req.syllabus_id,
+            student_context=req.student_context,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"MCQ generation failed: {exc}") from exc
@@ -191,6 +197,7 @@ class NumericalsRequest(BaseModel):
     difficulty: str = "mixed"
     syllabus_context: list[str] = []
     syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
+    student_context: Optional[str] = None  # one-line profile summary, e.g. "B.Tech 2nd Year, CS, SPPU"
 
 
 @app.post("/agent/generate-numericals")
@@ -204,6 +211,7 @@ async def agent_generate_numericals(req: NumericalsRequest):
             difficulty=req.difficulty,
             syllabus_context=req.syllabus_context,
             syllabus_id=req.syllabus_id,
+            student_context=req.student_context,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Numericals generation failed: {exc}") from exc
@@ -218,6 +226,7 @@ class TutorRequest(BaseModel):
     topic_name: str
     subject: str
     syllabus_context: list[str] = []
+    notebook_id: Optional[str] = None  # scopes RAG retrieval to this notebook's generated notes
 
 
 @app.post("/agent/tutor-chat")
@@ -230,6 +239,7 @@ async def agent_tutor_chat(req: TutorRequest):
             topic_name=req.topic_name,
             topic_id=req.topic_id,
             syllabus_context=req.syllabus_context,
+            notebook_id=req.notebook_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Tutor response failed: {exc}") from exc

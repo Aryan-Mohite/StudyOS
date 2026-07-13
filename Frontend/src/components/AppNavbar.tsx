@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { Brain, LayoutDashboard, Calendar, Upload } from "lucide-react";
+import { ProfileBadge } from "@/components/ProfileBadge";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -36,6 +37,7 @@ export function AppNavbar() {
 
         {/* Signed-in user */}
         <div className="ml-auto flex items-center gap-2">
+          <ProfileBadge />
           <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </div>

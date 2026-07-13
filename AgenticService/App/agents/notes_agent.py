@@ -68,6 +68,7 @@ def generate_notes(
     topic_id: str,
     syllabus_context: Optional[list[str]] = None,
     reference_context: Optional[list[str]] = None,
+    student_context: Optional[str] = None,
 ) -> dict:
     """
     Call Claude to generate study notes for a topic.
@@ -78,8 +79,14 @@ def generate_notes(
     reference material (textbook/lecture PDFs) for this syllabus. When
     present, the model is asked to ground notes in these excerpts rather
     than relying solely on trained knowledge.
+
+    student_context: optional one-line profile summary (e.g. "B.Tech 2nd
+    Year, CS, SPPU") derived from the student's profile. Purely additive —
+    when absent, prompt behaves exactly as before. Used to calibrate depth
+    and framing, never to restrict content.
     """
     context_str = ", ".join(syllabus_context) if syllabus_context else "None provided"
+    student_block = f"\nStudent profile: {student_context}" if student_context else ""
 
     reference_block = ""
     if reference_context:
@@ -99,6 +106,7 @@ Subject: {subject}
 Unit: {unit_title}
 Topic: {topic_name}
 Other topics in this unit (for context and related_topics): {context_str}
+{student_block}
 {reference_block}
 
 The student is preparing for undergraduate engineering exams. Return the JSON notes object."""

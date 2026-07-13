@@ -175,6 +175,7 @@ export default function StudyPage() {
             topicName={topic.name}
             subject={topic.subject}
             syllabusContext={syllabusContext}
+            syllabusId={syllabus?.syllabus_id}
           />
         </div>
       </aside>

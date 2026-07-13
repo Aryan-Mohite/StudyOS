@@ -102,6 +102,7 @@ def generate_numericals(
     difficulty: str = "mixed",
     syllabus_context: Optional[list[str]] = None,
     reference_context: Optional[list[str]] = None,
+    student_context: Optional[str] = None,
 ) -> dict:
     """
     Call Claude to generate a solved numericals set for a topic.
@@ -113,6 +114,7 @@ def generate_numericals(
     worked-example style) rather than relying solely on trained knowledge.
     """
     context_str = ", ".join(syllabus_context) if syllabus_context else "None provided"
+    student_block = f"Student profile: {student_context}" if student_context else ""
 
     reference_block = ""
     if reference_context:
@@ -132,6 +134,7 @@ Subject: {subject}
 Topic: {topic_name}
 Difficulty: {difficulty}
 Syllabus context (other topics in this unit): {context_str}
+{student_block}
 {reference_block}
 
 The student is preparing for undergraduate engineering exams.

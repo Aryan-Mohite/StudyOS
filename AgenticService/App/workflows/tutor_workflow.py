@@ -27,6 +27,7 @@ class TutorState(TypedDict):
     subject: str
     topic_name: str
     topic_id: str
+    notebook_id: Optional[str]
     syllabus_context: list[str]
     chat_history: list[dict]  # accumulated across turns via the checkpointer
     retrieved_chunks: Optional[list[dict]]
@@ -39,6 +40,7 @@ def _retrieve_node(state: TutorState) -> TutorState:
         query=state["question"],
         topic_id=state.get("topic_id"),
         k=4,
+        notebook_id=state.get("notebook_id"),
     )
     return {**state, "retrieved_chunks": chunks}
 
@@ -82,6 +84,7 @@ def run_tutor_turn(
     topic_name: str,
     topic_id: str,
     syllabus_context: list[str],
+    notebook_id: Optional[str] = None,
 ) -> dict:
     """
     Entry point used by main.py. `session_id` should be stable per
@@ -100,6 +103,7 @@ def run_tutor_turn(
             "subject": subject,
             "topic_name": topic_name,
             "topic_id": topic_id,
+            "notebook_id": notebook_id,
             "syllabus_context": syllabus_context,
             "retrieved_chunks": None,
             "result": None,

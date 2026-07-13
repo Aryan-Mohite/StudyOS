@@ -8,6 +8,22 @@
  */
 
 // ─────────────────────────────────────────
+// PROFILE
+// ─────────────────────────────────────────
+
+export interface UserProfile {
+  user_id: string;
+  name: string | null;
+  education_level: string | null;
+  course: string | null;
+  university: string | null;
+  /** Server-derived — true only when all fields above are non-empty. */
+  completed: boolean;
+}
+
+export type ProfileState = "idle" | "loading" | "success" | "saving" | "error";
+
+// ─────────────────────────────────────────
 // SYLLABUS
 // ─────────────────────────────────────────
 

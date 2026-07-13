@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getPool, initDb } from "@/lib/db";
+import { getStudentContext } from "@/lib/profile";
 import { generateNumericals as callAgenticNumericals, AgenticError } from "@/lib/agentic";
 import type { RowDataPacket } from "mysql2";
 
@@ -56,6 +58,9 @@ export async function POST(req: NextRequest) {
 
   // ── Delegate to AgenticService ───────────────────────────────────────────
   try {
+    const { userId } = await auth();
+    const student_context = userId ? await getStudentContext(userId) : undefined;
+
     const numericalSet = await callAgenticNumericals({
       topic_id,
       topic_name,
@@ -64,6 +69,7 @@ export async function POST(req: NextRequest) {
       difficulty,
       syllabus_context,
       syllabus_id: syllabus_id || undefined,
+      student_context,
     });
 
     await pool.query(

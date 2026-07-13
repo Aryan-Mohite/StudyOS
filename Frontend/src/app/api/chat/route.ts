@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { tutorChat as callAgenticTutor, AgenticError } from "@/lib/agentic";
+import { getNotebookIdForSyllabus } from "@/lib/db";
 
 /**
  * POST /api/chat
@@ -9,6 +10,10 @@ import { tutorChat as callAgenticTutor, AgenticError } from "@/lib/agentic";
  * here by design — each answer is generated fresh — conversation memory is
  * handled server-side by the AgenticService's LangGraph checkpointer, keyed
  * by `session_id` (stable per user+topic conversation).
+ *
+ * `syllabus_id`, when provided, is resolved to its notebook so RAG
+ * retrieval only pulls notes generated for that subject — without it,
+ * retrieval falls back to the legacy global collection.
  */
 export async function POST(req: NextRequest) {
   const { userId: clerkUserId } = await auth();
@@ -19,6 +24,7 @@ export async function POST(req: NextRequest) {
     topic_name,
     subject,
     syllabus_context = [],
+    syllabus_id,
     user_id: bodyUserId = "dev-user-01",
   } = body ?? {};
   const user_id = clerkUserId ?? bodyUserId;
@@ -33,6 +39,10 @@ export async function POST(req: NextRequest) {
   const session_id = `${user_id}:${topic_id}`;
 
   try {
+    const notebook_id = syllabus_id
+      ? (await getNotebookIdForSyllabus(syllabus_id)) ?? undefined
+      : undefined;
+
     const response = await callAgenticTutor({
       session_id,
       question,
@@ -40,6 +50,7 @@ export async function POST(req: NextRequest) {
       topic_name,
       subject,
       syllabus_context,
+      notebook_id,
     });
     return NextResponse.json(response);
   } catch (err) {

@@ -165,6 +165,7 @@ export interface SendChatMessageInput {
   topic_name: string;
   subject: string;
   syllabus_context?: string[];
+  syllabus_id?: string; // resolved server-side to notebook_id, scopes RAG retrieval to this subject
   history?: ChatMessage[]; // for callers that also want to keep local UI history
 }
 

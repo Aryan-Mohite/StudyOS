@@ -27,7 +27,21 @@ _VECTOR_DIR.mkdir(parents=True, exist_ok=True)
 _embeddings: Optional[HuggingFaceEmbeddings] = None
 _splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
 
-_COLLECTION_NAME = "studyos_notes"
+_COLLECTION_NAME = "studyos_notes"  # legacy/global fallback — used only when no notebook_id is given
+
+
+def _notes_collection_name(notebook_id: Optional[str]) -> str:
+    """
+    Per-notebook namespace for generated-notes retrieval. Falls back to the
+    single legacy global collection when notebook_id is absent, so existing
+    callers (or content generated before notebooks existed) keep working.
+    """
+    if not notebook_id:
+        return _COLLECTION_NAME
+    safe_id = "".join(c for c in notebook_id if c.isalnum() or c in "-_")
+    if not safe_id:
+        return _COLLECTION_NAME
+    return f"studyos_notes_{safe_id}"
 
 
 def _get_embeddings() -> HuggingFaceEmbeddings:
@@ -37,17 +51,25 @@ def _get_embeddings() -> HuggingFaceEmbeddings:
     return _embeddings
 
 
-def _get_store() -> Chroma:
+def _get_store(notebook_id: Optional[str] = None) -> Chroma:
     return Chroma(
-        collection_name=_COLLECTION_NAME,
+        collection_name=_notes_collection_name(notebook_id),
         embedding_function=_get_embeddings(),
         persist_directory=str(_VECTOR_DIR),
     )
 
 
-def index_note(topic_id: str, subject: str, topic_name: str, note: dict) -> int:
+def index_note(
+    topic_id: str,
+    subject: str,
+    topic_name: str,
+    note: dict,
+    notebook_id: Optional[str] = None,
+) -> int:
     """
-    Chunk a generated Notes contract object and upsert it into the vector store.
+    Chunk a generated Notes contract object and upsert it into the vector
+    store scoped to `notebook_id` (one Chroma collection per notebook, so
+    Tutor Chat for one subject never retrieves another subject's notes).
     Call this right after Notes generation succeeds. Returns chunk count indexed.
     """
     text_parts: list[str] = []
@@ -71,18 +93,24 @@ def index_note(topic_id: str, subject: str, topic_name: str, note: dict) -> int:
         for chunk in chunks
     ]
 
-    store = _get_store()
+    store = _get_store(notebook_id)
     store.add_documents(docs)
     return len(docs)
 
 
-def retrieve_context(query: str, topic_id: Optional[str] = None, k: int = 4) -> list[dict]:
+def retrieve_context(
+    query: str,
+    topic_id: Optional[str] = None,
+    k: int = 4,
+    notebook_id: Optional[str] = None,
+) -> list[dict]:
     """
-    Similarity-search the vector store for chunks relevant to `query`.
-    If topic_id is given, restrict retrieval to that topic's notes.
-    Returns a list of {text, topic, subject} dicts (empty list if nothing indexed yet).
+    Similarity-search the notebook-scoped vector store for chunks relevant
+    to `query`. If topic_id is given, further restrict to that topic's
+    notes within the notebook. Returns a list of {text, topic, subject}
+    dicts (empty list if nothing indexed yet for this notebook).
     """
-    store = _get_store()
+    store = _get_store(notebook_id)
     filter_ = {"topic_id": topic_id} if topic_id else None
 
     try:

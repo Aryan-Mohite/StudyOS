@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 import { getPool, initDb } from "@/lib/db";
 import { parseSyllabus, AgenticError } from "@/lib/agentic";
@@ -35,19 +36,33 @@ export async function POST(req: NextRequest) {
       [key: string]: unknown;
     };
 
-    // Cache in MySQL
+    // Cache in MySQL — every syllabus upload auto-creates its own notebook,
+    // the container that reference-PDF uploads and RAG namespacing will
+    // attach to. No explicit "create notebook" step needed (see product
+    // decision: auto-create).
     const pool = getPool();
+
+    const parsedTyped = parsed as { subjects?: Array<{ name?: string }> };
+    const subjectName = parsedTyped.subjects?.[0]?.name ?? file.name.replace(/\.pdf$/i, "");
+    const notebookId = randomUUID();
+
     await pool.query(
-      `INSERT INTO syllabi (id, user_id, filename, parsed_json)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         user_id = VALUES(user_id),
-         filename = VALUES(filename),
-         parsed_json = VALUES(parsed_json)`,
-      [parsed.syllabus_id, userId, file.name, JSON.stringify(parsed)],
+      `INSERT INTO notebooks (id, user_id, subject_name) VALUES (?, ?, ?)`,
+      [notebookId, userId, subjectName],
     );
 
-    return NextResponse.json(parsed);
+    await pool.query(
+      `INSERT INTO syllabi (id, user_id, notebook_id, filename, parsed_json)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         user_id = VALUES(user_id),
+         notebook_id = VALUES(notebook_id),
+         filename = VALUES(filename),
+         parsed_json = VALUES(parsed_json)`,
+      [parsed.syllabus_id, userId, notebookId, file.name, JSON.stringify(parsed)],
+    );
+
+    return NextResponse.json({ ...parsed, notebook_id: notebookId });
   } catch (err) {
     if (err instanceof AgenticError) {
       return NextResponse.json({ detail: err.detail }, { status: err.status || 502 });
