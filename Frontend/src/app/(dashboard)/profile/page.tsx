@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PROFILE_UPDATED_EVENT } from "@/components/ProfileBadge";
 import type { UserProfile } from "@/types";
 
 const EDUCATION_LEVELS = [
@@ -64,6 +65,7 @@ export default function ProfilePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? "Failed to save profile.");
       setSavedAt(Date.now());
+      window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile.");
     } finally {

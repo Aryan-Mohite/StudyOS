@@ -1,37 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { UserCircle } from "lucide-react";
 import type { UserProfile } from "@/types";
 
+/** Dispatched by the profile page after a successful save so the navbar
+ *  badge (which stays mounted across client-side navigation) updates
+ *  immediately instead of waiting for a full page reload. */
+export const PROFILE_UPDATED_EVENT = "studyos:profile-updated";
+
 /**
- * Sits in the navbar. Fetches /api/profile once on mount and shows a small
- * amber dot + "Complete profile for better results" hint whenever the
- * profile is missing or incomplete. Never blocks navigation — profile is
- * skippable per product decision.
+ * Sits in the navbar. Fetches /api/profile on mount, whenever the route
+ * changes, whenever the tab regains focus, and whenever a save on the
+ * profile page broadcasts PROFILE_UPDATED_EVENT — so the "complete your
+ * profile" nudge clears without requiring a full page reload. Never
+ * blocks navigation — profile is skippable per product decision.
  */
 export function ProfileBadge() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const pathname = usePathname();
 
-  useEffect(() => {
-    let cancelled = false;
+  const refetch = useCallback(() => {
     fetch("/api/profile")
       .then((res) => res.json())
       .then((data: { exists: boolean; profile: UserProfile | null }) => {
-        if (!cancelled) {
-          setProfile(data.profile);
-          setLoaded(true);
-        }
+        setProfile(data.profile);
+        setLoaded(true);
       })
-      .catch(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => setLoaded(true));
   }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch, pathname]);
+
+  useEffect(() => {
+    window.addEventListener(PROFILE_UPDATED_EVENT, refetch);
+    window.addEventListener("focus", refetch);
+    return () => {
+      window.removeEventListener(PROFILE_UPDATED_EVENT, refetch);
+      window.removeEventListener("focus", refetch);
+    };
+  }, [refetch]);
 
   const incomplete = loaded && !profile?.completed;
 

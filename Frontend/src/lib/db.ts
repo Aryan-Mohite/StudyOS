@@ -120,7 +120,41 @@ export async function initDb(): Promise<void> {
   for (const stmt of statements) {
     await pool.query(stmt);
   }
+
+  await migrateSchema(pool);
   _initialized = true;
+}
+
+/**
+ * `CREATE TABLE IF NOT EXISTS` only helps on a fresh database — it does
+ * nothing for a `syllabi` table that already existed before the notebooks
+ * feature was added (which is exactly what caused "Unknown column
+ * 'notebook_id' in 'field list'"). This adds any columns/indexes that are
+ * missing on tables that already existed, so upgrading an existing DB
+ * doesn't require running SQL by hand.
+ */
+async function migrateSchema(pool: mysql.Pool): Promise<void> {
+  const [dbRows] = await pool.query<mysql.RowDataPacket[]>("SELECT DATABASE() AS db");
+  const dbName = dbRows[0]?.db;
+  if (!dbName) return;
+
+  const [columnRows] = await pool.query<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'syllabi'`,
+    [dbName],
+  );
+  const existingColumns = new Set(columnRows.map((r) => r.COLUMN_NAME as string));
+
+  if (!existingColumns.has("notebook_id")) {
+    await pool.query(`ALTER TABLE syllabi ADD COLUMN notebook_id VARCHAR(64)`);
+    // Index creation can fail harmlessly if it somehow already exists —
+    // don't let that abort startup.
+    try {
+      await pool.query(`ALTER TABLE syllabi ADD INDEX idx_syllabi_notebook (notebook_id)`);
+    } catch {
+      /* index already present — ignore */
+    }
+  }
 }
 
 /**
