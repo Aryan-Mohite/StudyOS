@@ -101,12 +101,30 @@ def generate_numericals(
     count: int = 5,
     difficulty: str = "mixed",
     syllabus_context: Optional[list[str]] = None,
+    reference_context: Optional[list[str]] = None,
 ) -> dict:
     """
     Call Claude to generate a solved numericals set for a topic.
     Validates against the Numericals contract via Pydantic.
+
+    reference_context: optional excerpts from student-uploaded reference
+    material (textbook/lecture PDFs) for this syllabus. When present, the
+    model is asked to ground problems in these excerpts (notation,
+    worked-example style) rather than relying solely on trained knowledge.
     """
     context_str = ", ".join(syllabus_context) if syllabus_context else "None provided"
+
+    reference_block = ""
+    if reference_context:
+        excerpts = "\n\n".join(f"[Excerpt {i+1}] {c}" for i, c in enumerate(reference_context))
+        reference_block = f"""
+
+The student has uploaded their own reference material for this syllabus.
+Base problems on these excerpts where relevant, in addition to your own
+knowledge — prefer notation, formula forms, and worked-example style
+consistent with this material over generic phrasing:
+
+{excerpts}"""
 
     user_prompt = f"""Generate {count} solved numerical problems for the following topic.
 
@@ -114,6 +132,7 @@ Subject: {subject}
 Topic: {topic_name}
 Difficulty: {difficulty}
 Syllabus context (other topics in this unit): {context_str}
+{reference_block}
 
 The student is preparing for undergraduate engineering exams.
 Return the JSON numericals set object."""
@@ -128,7 +147,9 @@ Return the JSON numericals set object."""
     raw["generated_at"] = now
 
     validated = NumericalSetResponse.model_validate(raw)
-    return validated.model_dump()
+    result = validated.model_dump()
+    result["grounded_in_reference"] = bool(reference_context)
+    return result
 
 
 # ── Quality validation + repair (used by App/workflows/numericals_workflow.py) ─
@@ -207,4 +228,6 @@ JSON numericals set object, same contract as before."""
     raw["generated_at"] = problem_set["generated_at"]
 
     validated = NumericalSetResponse.model_validate(raw)
-    return validated.model_dump()
+    result = validated.model_dump()
+    result["grounded_in_reference"] = problem_set.get("grounded_in_reference", False)
+    return result

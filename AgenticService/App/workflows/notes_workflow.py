@@ -1,9 +1,13 @@
 """
-notes_workflow.py — LangGraph graph: generate notes → index into the RAG
-vector store (so Tutor Chat can retrieve them later) → return.
+notes_workflow.py — LangGraph graph: (retrieve student-uploaded reference
+material, if any) → generate notes → index into the RAG vector store (so
+Tutor Chat can retrieve them later) → return.
 
 Indexing failure never fails the request — notes generation succeeding is
 the thing the user is waiting on; RAG indexing is best-effort plumbing.
+Reference-material retrieval is likewise best-effort: no upload for this
+syllabus is the expected default, not an error (see
+App/workflows/README.md).
 """
 
 from typing import Optional, TypedDict
@@ -11,7 +15,7 @@ from typing import Optional, TypedDict
 from langgraph.graph import END, StateGraph
 
 from App.agents.notes_agent import generate_notes
-from App.services.rag_service import index_note
+from App.services.rag_service import index_note, retrieve_reference_context
 
 
 class NotesState(TypedDict):
@@ -19,12 +23,23 @@ class NotesState(TypedDict):
     subject: str
     unit_title: str
     topic_id: str
+    syllabus_id: Optional[str]
     syllabus_context: list[str]
     result: Optional[dict]
     error: Optional[str]
 
 
 def _generate_node(state: NotesState) -> NotesState:
+    reference_context: list[str] = []
+    if state.get("syllabus_id"):
+        try:
+            hits = retrieve_reference_context(
+                state["syllabus_id"], query=state["topic_name"], k=4
+            )
+            reference_context = [hit["text"] for hit in hits]
+        except Exception:
+            reference_context = []
+
     try:
         result = generate_notes(
             topic_name=state["topic_name"],
@@ -32,6 +47,7 @@ def _generate_node(state: NotesState) -> NotesState:
             unit_title=state["unit_title"],
             topic_id=state["topic_id"],
             syllabus_context=state.get("syllabus_context", []),
+            reference_context=reference_context,
         )
         return {**state, "result": result, "error": None}
     except ValueError as exc:
@@ -76,6 +92,7 @@ def run_notes_generation(
     unit_title: str,
     topic_id: str,
     syllabus_context: list[str],
+    syllabus_id: Optional[str] = None,
 ) -> dict:
     """Entry point used by main.py. Raises ValueError on failure."""
     final_state = _GRAPH.invoke(
@@ -84,6 +101,7 @@ def run_notes_generation(
             "subject": subject,
             "unit_title": unit_title,
             "topic_id": topic_id,
+            "syllabus_id": syllabus_id,
             "syllabus_context": syllabus_context,
             "result": None,
             "error": None,

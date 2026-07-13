@@ -129,6 +129,7 @@ export default function StudyPage() {
               subject={topic.subject}
               unitTitle={topic.unit_title}
               syllabusContext={syllabusContext}
+              syllabusId={syllabus?.syllabus_id}
             />
           )}
           {activeTab === "problems" && (
@@ -138,6 +139,7 @@ export default function StudyPage() {
               subject={topic.subject}
               hasNumericals={topic.has_numericals}
               syllabusContext={syllabusContext}
+              syllabusId={syllabus?.syllabus_id}
             />
           )}
           {activeTab === "mcq" && (
@@ -146,6 +148,7 @@ export default function StudyPage() {
               topicName={topic.name}
               subject={topic.subject}
               syllabusContext={syllabusContext}
+              syllabusId={syllabus?.syllabus_id}
             />
           )}
         </div>

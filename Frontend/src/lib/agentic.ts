@@ -45,9 +45,9 @@ export async function parseSyllabus(file: File): Promise<unknown> {
   const res = await fetch(`${AGENTIC}/agent/parse-syllabus`, {
     method: "POST",
     body: form,
-    // 180s budget: covers the OCR fallback path (several seconds/page for
+    // 210s budget: covers the OCR fallback path (several seconds/page for
     // scanned PDFs, up to 40 pages) plus the LLM parse call.
-    signal: AbortSignal.timeout(180_000),
+    signal: AbortSignal.timeout(210_000),
   });
   return handle(res);
 }
@@ -58,6 +58,7 @@ export interface GenerateNotesPayload {
   subject: string;
   unit_title: string;
   syllabus_context: string[];
+  syllabus_id?: string;
 }
 
 export async function generateNotes(
@@ -67,7 +68,7 @@ export async function generateNotes(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(90_000),
   });
   return handle(res);
 }
@@ -79,6 +80,7 @@ export interface GenerateMCQPayload {
   count: number;
   difficulty: string;
   syllabus_context: string[];
+  syllabus_id?: string;
 }
 
 export async function generateMCQ(
@@ -88,7 +90,7 @@ export async function generateMCQ(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(90_000),
   });
   return handle(res);
 }
@@ -100,6 +102,7 @@ export interface GenerateNumericalsPayload {
   count: number;
   difficulty: string;
   syllabus_context: string[];
+  syllabus_id?: string;
 }
 
 export async function generateNumericals(
@@ -110,7 +113,7 @@ export async function generateNumericals(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     // Numericals can take longer than notes/MCQ — worked steps for each problem.
-    signal: AbortSignal.timeout(75_000),
+    signal: AbortSignal.timeout(105_000),
   });
   return handle(res);
 }
@@ -131,7 +134,7 @@ export async function tutorChat(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(75_000),
   });
   return handle(res);
 }

@@ -11,6 +11,7 @@ the full request flow.
 """
 
 import os
+from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -24,6 +25,7 @@ from App.agents.syllabus_agent import run_syllabus_parse
 from App.workflows.mcq_workflow import run_mcq_generation
 from App.workflows.notes_workflow import run_notes_generation
 from App.workflows.numericals_workflow import run_numericals_generation
+from App.workflows.reference_material_workflow import run_reference_ingestion
 from App.workflows.tutor_workflow import run_tutor_turn
 
 app = FastAPI(
@@ -94,6 +96,36 @@ async def agent_parse_syllabus(
     return parsed
 
 
+# ── Reference material ingestion (optional, per-syllabus) ─────────────────────
+
+@app.post("/agent/ingest-reference-material")
+async def agent_ingest_reference_material(
+    syllabus_id: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """
+    Ingests one student-uploaded reference file (textbook chapter, lecture
+    PDF, past-paper solutions) for a syllabus. Optional feature — call this
+    zero or more times per syllabus_id; each call adds to the same
+    reference-material collection for that syllabus (see
+    App/services/rag_service.py). Not required for Notes/MCQ/Numericals to
+    work — those fall back to trained knowledge alone if nothing's indexed.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
+
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    try:
+        return await run_in_threadpool(
+            run_reference_ingestion, syllabus_id, file.filename, raw_bytes
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 # ── Notes generation ──────────────────────────────────────────────────────────
 
 class NotesRequest(BaseModel):
@@ -102,6 +134,7 @@ class NotesRequest(BaseModel):
     subject: str
     unit_title: str
     syllabus_context: list[str] = []
+    syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
 
 
 @app.post("/agent/generate-notes")
@@ -114,6 +147,7 @@ async def agent_generate_notes(req: NotesRequest):
             unit_title=req.unit_title,
             topic_id=req.topic_id,
             syllabus_context=req.syllabus_context,
+            syllabus_id=req.syllabus_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Notes generation failed: {exc}") from exc
@@ -128,6 +162,7 @@ class MCQRequest(BaseModel):
     count: int = 10
     difficulty: str = "mixed"
     syllabus_context: list[str] = []
+    syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
 
 
 @app.post("/agent/generate-mcq")
@@ -140,6 +175,7 @@ async def agent_generate_mcq(req: MCQRequest):
             count=req.count,
             difficulty=req.difficulty,
             syllabus_context=req.syllabus_context,
+            syllabus_id=req.syllabus_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"MCQ generation failed: {exc}") from exc
@@ -154,6 +190,7 @@ class NumericalsRequest(BaseModel):
     count: int = 5
     difficulty: str = "mixed"
     syllabus_context: list[str] = []
+    syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
 
 
 @app.post("/agent/generate-numericals")
@@ -166,6 +203,7 @@ async def agent_generate_numericals(req: NumericalsRequest):
             count=req.count,
             difficulty=req.difficulty,
             syllabus_context=req.syllabus_context,
+            syllabus_id=req.syllabus_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Numericals generation failed: {exc}") from exc

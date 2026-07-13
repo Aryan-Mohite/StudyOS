@@ -80,12 +80,30 @@ def generate_mcq(
     count: int = 10,
     difficulty: str = "mixed",
     syllabus_context: Optional[list[str]] = None,
+    reference_context: Optional[list[str]] = None,
 ) -> dict:
     """
     Call Claude to generate an MCQ set for a topic.
     Validates against the MCQ contract via Pydantic.
+
+    reference_context: optional excerpts retrieved from student-uploaded
+    reference material (textbook/lecture PDFs) for this syllabus. When
+    present, the model is asked to ground questions in these excerpts
+    rather than relying solely on trained knowledge.
     """
     context_str = ", ".join(syllabus_context) if syllabus_context else "None provided"
+
+    reference_block = ""
+    if reference_context:
+        excerpts = "\n\n".join(f"[Excerpt {i+1}] {c}" for i, c in enumerate(reference_context))
+        reference_block = f"""
+
+The student has uploaded their own reference material for this syllabus.
+Base your questions on these excerpts where relevant, in addition to your
+own knowledge — prefer terminology, notation, and examples consistent with
+this material over generic phrasing:
+
+{excerpts}"""
 
     user_prompt = f"""Generate {count} multiple-choice questions for the following topic.
 
@@ -93,6 +111,7 @@ Subject: {subject}
 Topic: {topic_name}
 Difficulty: {difficulty}
 Syllabus context (other topics in this unit): {context_str}
+{reference_block}
 
 The student is preparing for undergraduate engineering exams.
 Return the JSON MCQ set object."""
@@ -108,7 +127,9 @@ Return the JSON MCQ set object."""
     raw["total_questions"] = len(raw.get("questions", []))
 
     validated = MCQResponse.model_validate(raw)
-    return validated.model_dump()
+    result = validated.model_dump()
+    result["grounded_in_reference"] = bool(reference_context)
+    return result
 
 
 # ── Quality validation + repair (used by App/workflows/mcq_workflow.py) ──────
@@ -182,4 +203,6 @@ object, same contract as before."""
     raw["total_questions"] = len(raw.get("questions", []))
 
     validated = MCQResponse.model_validate(raw)
-    return validated.model_dump()
+    result = validated.model_dump()
+    result["grounded_in_reference"] = mcq_set.get("grounded_in_reference", False)
+    return result

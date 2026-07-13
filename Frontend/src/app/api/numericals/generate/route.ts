@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       count: safeCount,
       difficulty,
       syllabus_context,
+      syllabus_id: syllabus_id || undefined,
     });
 
     await pool.query(

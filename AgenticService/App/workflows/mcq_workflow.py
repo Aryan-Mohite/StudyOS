@@ -15,6 +15,7 @@ from typing import Optional, TypedDict
 from langgraph.graph import END, StateGraph
 
 from App.agents.mcq_agent import generate_mcq, repair_mcq, validate_mcq_quality
+from App.services.rag_service import retrieve_reference_context
 
 
 class MCQState(TypedDict):
@@ -23,6 +24,7 @@ class MCQState(TypedDict):
     topic_id: str
     count: int
     difficulty: str
+    syllabus_id: Optional[str]
     syllabus_context: list[str]
     result: Optional[dict]
     issues: list[str]
@@ -31,6 +33,16 @@ class MCQState(TypedDict):
 
 
 def _generate_node(state: MCQState) -> MCQState:
+    reference_context: list[str] = []
+    if state.get("syllabus_id"):
+        try:
+            hits = retrieve_reference_context(
+                state["syllabus_id"], query=state["topic_name"], k=4
+            )
+            reference_context = [hit["text"] for hit in hits]
+        except Exception:
+            reference_context = []
+
     try:
         result = generate_mcq(
             topic_name=state["topic_name"],
@@ -39,6 +51,7 @@ def _generate_node(state: MCQState) -> MCQState:
             count=state["count"],
             difficulty=state["difficulty"],
             syllabus_context=state.get("syllabus_context", []),
+            reference_context=reference_context,
         )
         return {**state, "result": result, "error": None}
     except ValueError as exc:
@@ -97,6 +110,7 @@ def run_mcq_generation(
     count: int,
     difficulty: str,
     syllabus_context: list[str],
+    syllabus_id: Optional[str] = None,
 ) -> dict:
     """Entry point used by main.py. Raises ValueError on failure."""
     final_state = _GRAPH.invoke(
@@ -106,6 +120,7 @@ def run_mcq_generation(
             "topic_id": topic_id,
             "count": count,
             "difficulty": difficulty,
+            "syllabus_id": syllabus_id,
             "syllabus_context": syllabus_context,
             "result": None,
             "issues": [],

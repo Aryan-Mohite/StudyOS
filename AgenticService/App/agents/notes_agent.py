@@ -67,13 +67,31 @@ def generate_notes(
     unit_title: str,
     topic_id: str,
     syllabus_context: Optional[list[str]] = None,
+    reference_context: Optional[list[str]] = None,
 ) -> dict:
     """
     Call Claude to generate study notes for a topic.
     Validates against the Notes contract via Pydantic.
     Raises ValueError if output fails validation after retries.
+
+    reference_context: optional excerpts retrieved from student-uploaded
+    reference material (textbook/lecture PDFs) for this syllabus. When
+    present, the model is asked to ground notes in these excerpts rather
+    than relying solely on trained knowledge.
     """
     context_str = ", ".join(syllabus_context) if syllabus_context else "None provided"
+
+    reference_block = ""
+    if reference_context:
+        excerpts = "\n\n".join(f"[Excerpt {i+1}] {c}" for i, c in enumerate(reference_context))
+        reference_block = f"""
+
+The student has uploaded their own reference material for this syllabus.
+Base these notes on these excerpts where relevant, in addition to your own
+knowledge — prefer terminology, notation, and examples consistent with
+this material over generic phrasing:
+
+{excerpts}"""
 
     user_prompt = f"""Generate study notes for the following topic.
 
@@ -81,6 +99,7 @@ Subject: {subject}
 Unit: {unit_title}
 Topic: {topic_name}
 Other topics in this unit (for context and related_topics): {context_str}
+{reference_block}
 
 The student is preparing for undergraduate engineering exams. Return the JSON notes object."""
 
@@ -94,4 +113,6 @@ The student is preparing for undergraduate engineering exams. Return the JSON no
     raw["generated_at"] = now
 
     validated = NoteResponse.model_validate(raw)
-    return validated.model_dump()
+    result = validated.model_dump()
+    result["grounded_in_reference"] = bool(reference_context)
+    return result

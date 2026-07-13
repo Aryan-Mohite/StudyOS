@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       subject,
       unit_title,
       syllabus_context,
+      syllabus_id: syllabus_id || undefined,
     });
 
     await pool.query(
