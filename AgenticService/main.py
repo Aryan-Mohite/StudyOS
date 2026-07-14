@@ -26,6 +26,7 @@ from App.workflows.mcq_workflow import run_mcq_generation
 from App.workflows.notes_workflow import run_notes_generation
 from App.workflows.numericals_workflow import run_numericals_generation
 from App.workflows.reference_material_workflow import run_reference_ingestion
+from App.workflows.study_plan_workflow import run_study_plan_generation
 from App.workflows.tutor_workflow import run_tutor_turn
 
 app = FastAPI(
@@ -243,6 +244,26 @@ async def agent_tutor_chat(req: TutorRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Tutor response failed: {exc}") from exc
+
+
+# ── Study plan generation ─────────────────────────────────────────────────────
+
+class StudyPlanRequest(BaseModel):
+    syllabus_id: str
+    syllabus: dict  # full parsed syllabus contract (see syllabus_agent.py)
+    exam_date: str  # YYYY-MM-DD
+
+
+@app.post("/agent/generate-study-plan")
+async def agent_generate_study_plan(req: StudyPlanRequest):
+    try:
+        return run_study_plan_generation(
+            syllabus_id=req.syllabus_id,
+            syllabus=req.syllabus,
+            exam_date=req.exam_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=f"Study plan generation failed: {exc}") from exc
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

@@ -122,6 +122,25 @@ export async function generateNumericals(
   return handle(res);
 }
 
+export interface GenerateStudyPlanPayload {
+  syllabus_id: string;
+  syllabus: unknown; // full parsed syllabus contract
+  exam_date: string; // YYYY-MM-DD
+}
+
+export async function generateStudyPlan(
+  payload: GenerateStudyPlanPayload,
+): Promise<{ study_plan_id: string; [key: string]: unknown }> {
+  const res = await fetch(`${AGENTIC}/agent/generate-study-plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    // Plans can span many days/topics — allow more budget than MCQ/Numericals.
+    signal: AbortSignal.timeout(120_000),
+  });
+  return handle(res);
+}
+
 export interface TutorChatPayload {
   session_id: string;
   question: string;

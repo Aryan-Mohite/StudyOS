@@ -28,10 +28,33 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [], s
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const suggested = DEFAULT_SUGGESTIONS;
+
+  // Resume any previously persisted conversation for this topic.
+  useEffect(() => {
+    if (!topicId) return;
+    let cancelled = false;
+    setHistoryLoaded(false);
+    setMessages([]);
+    fetch(`/api/chat?topic_id=${encodeURIComponent(topicId)}`)
+      .then((res) => (res.ok ? res.json() : { messages: [] }))
+      .then((data) => {
+        if (!cancelled) setMessages(data.messages ?? []);
+      })
+      .catch(() => {
+        /* No history yet, or fetch failed — start with a blank panel. */
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -95,7 +118,11 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [], s
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 ? (
+        {!historyLoaded ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-[12px] text-gray-400">Loading conversation…</p>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-col gap-3">
             <p className="text-[12px] text-gray-400 text-center">
               {topicName ? `Ask anything about ${topicName}` : "Select a topic to start"}

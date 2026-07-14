@@ -103,6 +103,32 @@ CREATE TABLE IF NOT EXISTS numerical_sets (
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_numerical_sets_topic_id (topic_id)
 );
+
+CREATE TABLE IF NOT EXISTS study_plans (
+  id           VARCHAR(64) PRIMARY KEY,
+  user_id      VARCHAR(128) NOT NULL DEFAULT 'dev-user-01',
+  syllabus_id  VARCHAR(64) NOT NULL,
+  exam_date    DATE NOT NULL,
+  content_json LONGTEXT NOT NULL,
+  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_study_plans_user (user_id),
+  INDEX idx_study_plans_syllabus (syllabus_id)
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  session_id    VARCHAR(256) NOT NULL,
+  user_id       VARCHAR(128) NOT NULL,
+  topic_id      VARCHAR(128) NOT NULL,
+  topic_name    VARCHAR(512) NOT NULL,
+  subject       VARCHAR(256) NOT NULL,
+  role          VARCHAR(16) NOT NULL,
+  content       LONGTEXT NOT NULL,
+  out_of_scope  BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_chat_messages_session (session_id, created_at),
+  INDEX idx_chat_messages_user (user_id, created_at)
+);
 `;
 
 let _initialized = false;
