@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Upload, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,9 +23,11 @@ export function CTA() {
         <p className="mx-auto mt-4 max-w-sm text-[16px] leading-relaxed text-gray-500">
           Go from &quot;I don&apos;t know where to start&quot; to a full study plan in minutes.
         </p>
-        <Button size="lg" className="mt-8">
-          <Upload size={16} /> Upload syllabus — it&apos;s free
-        </Button>
+        <Link href="/upload">
+          <Button size="lg" className="mt-8">
+            <Upload size={16} /> Upload syllabus — it&apos;s free
+          </Button>
+        </Link>
         <p className="mt-4 text-[13px] text-gray-400">
           No credit card · Works for any Indian university
         </p>

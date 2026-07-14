@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { FileText, Calculator, Youtube, HelpCircle, Calendar, TrendingUp, MessageSquare, ChevronRight } from "lucide-react";
+import { FileText, Calculator, Youtube, HelpCircle, Calendar, TrendingUp, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const features = [
@@ -71,10 +71,10 @@ export function Features() {
           </div>
           <div className="flex flex-wrap gap-2">
             {prompts.map((p) => (
-              <button key={p} type="button"
-                className="flex cursor-pointer items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-100">
-                {p} <ChevronRight size={11} />
-              </button>
+              <span key={p}
+                className="flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">
+                {p}
+              </span>
             ))}
           </div>
         </div>

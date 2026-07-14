@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Upload, Video, Sparkles } from "lucide-react";
 import { Button }  from "@/components/ui/button";
@@ -39,12 +40,16 @@ export function Hero() {
           </motion.p>
 
           <motion.div {...fadeUp(0.3)} className="mt-8 flex flex-wrap gap-3">
-            <Button size="lg">
-              <Upload size={16} /> Upload syllabus — free
-            </Button>
-            <Button size="lg" variant="outline">
-              <Video size={15} /> See demo
-            </Button>
+            <Link href="/upload">
+              <Button size="lg">
+                <Upload size={16} /> Upload syllabus — free
+              </Button>
+            </Link>
+            <a href="#features">
+              <Button size="lg" variant="outline">
+                <Video size={15} /> See how it works
+              </Button>
+            </a>
           </motion.div>
 
           {/* Stats */}

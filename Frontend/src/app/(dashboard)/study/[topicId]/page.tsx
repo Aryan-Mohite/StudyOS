@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { FileText, Calculator, HelpCircle, ChevronLeft, Maximize2, Loader2 } from "lucide-react";
+import { FileText, Calculator, HelpCircle, ChevronLeft, Maximize2, Loader2, List, MessageSquare, X } from "lucide-react";
 import { SyllabusTree } from "@/components/SyllabusTree";
 import { NotesView } from "@/components/NotesView";
 import { NumericalsView } from "@/components/NumericalsView";
@@ -46,6 +46,9 @@ export default function StudyPage() {
   const [chatExpanded, setChatExpanded] = useState(false);
   const [syllabus, setSyllabus] = useState<Syllabus | null>(null);
   const [loadError, setLoadError] = useState(false);
+  // Mobile-only: the syllabus tree and tutor panel are hidden below md/lg
+  // breakpoints, so they need to be reachable as overlays instead.
+  const [mobilePanel, setMobilePanel] = useState<"syllabus" | "tutor" | null>(null);
 
   useEffect(() => {
     getLatestSyllabus()
@@ -103,21 +106,40 @@ export default function StudyPage() {
         </div>
 
         {/* Tabs */}
-        <div className="shrink-0 flex border-b border-border bg-surface">
-          {TABS.map(({ id, label, icon: Icon }) => (
+        <div className="shrink-0 flex items-center justify-between border-b border-border bg-surface">
+          <div className="flex">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-1.5 border-b-2 px-5 py-3 text-[13px] font-medium transition-colors ${
+                  activeTab === id
+                    ? "border-brand-500 text-brand-600"
+                    : "border-transparent text-gray-500 hover:text-gray-800"
+                }`}
+              >
+                <Icon size={13} />
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Mobile-only access to syllabus tree and tutor, which are hidden as side panels below lg/md */}
+          <div className="flex items-center gap-1 pr-3 lg:hidden">
             <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 border-b-2 px-5 py-3 text-[13px] font-medium transition-colors ${
-                activeTab === id
-                  ? "border-brand-500 text-brand-600"
-                  : "border-transparent text-gray-500 hover:text-gray-800"
-              }`}
+              onClick={() => setMobilePanel("syllabus")}
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-gray-500 hover:bg-page hover:text-brand-600 transition-colors"
+              aria-label="Open syllabus"
             >
-              <Icon size={13} />
-              {label}
+              <List size={14} />
             </button>
-          ))}
+            <button
+              onClick={() => setMobilePanel("tutor")}
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-gray-500 hover:bg-page hover:text-brand-600 transition-colors md:hidden"
+              aria-label="Open AI tutor"
+            >
+              <MessageSquare size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Tab content */}
@@ -179,6 +201,45 @@ export default function StudyPage() {
           />
         </div>
       </aside>
+
+      {/* ── Mobile overlays: syllabus tree / tutor ─────────────── */}
+      {mobilePanel && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setMobilePanel(null)}
+          />
+          <div className="relative ml-auto flex h-full w-[85%] max-w-sm flex-col bg-surface shadow-xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+              <span className="text-[13px] font-semibold text-gray-900">
+                {mobilePanel === "syllabus" ? "Syllabus" : "AI Tutor"}
+              </span>
+              <button
+                onClick={() => setMobilePanel(null)}
+                className="rounded p-1 text-gray-400 hover:text-brand-500 transition-colors"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {mobilePanel === "syllabus" ? (
+                <div className="h-full overflow-y-auto p-3">
+                  <SyllabusTree syllabus={syllabus!} activeTopicId={topicId} />
+                </div>
+              ) : (
+                <ChatPanel
+                  topicId={topicId}
+                  topicName={topic.name}
+                  subject={topic.subject}
+                  syllabusContext={syllabusContext}
+                  syllabusId={syllabus?.syllabus_id}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

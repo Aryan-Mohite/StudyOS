@@ -141,11 +141,16 @@ export default async function DashboardPage() {
                     <h3 className="font-display text-[15px] font-bold text-gray-900">{subject.name}</h3>
                     <p className="text-[12px] text-gray-500">{subject.code} · {subject.units.length} units · {topicCount} topics</p>
                   </div>
-                  <Link href={`/study/${subject.units[0].topics[0].topic_id}`}>
-                    <Button size="sm" variant="outline" className="text-[12px]">
-                      Start Studying <ArrowRight size={12} />
-                    </Button>
-                  </Link>
+                  {(() => {
+                    const firstTopic = subject.units.flatMap((u) => u.topics)[0];
+                    return firstTopic ? (
+                      <Link href={`/study/${firstTopic.topic_id}`}>
+                        <Button size="sm" variant="outline" className="text-[12px]">
+                          Start Studying <ArrowRight size={12} />
+                        </Button>
+                      </Link>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="flex flex-wrap gap-2 bg-surface px-5 py-4">
                   {subject.units.flatMap((u) => u.topics).slice(0, 8).map((topic) => (
@@ -155,10 +160,12 @@ export default async function DashboardPage() {
                       </span>
                     </Link>
                   ))}
-                  {topicCount > 8 && (
-                    <span className="rounded-full border border-border bg-page px-3 py-1 text-[12px] text-gray-400">
-                      +{topicCount - 8} more
-                    </span>
+                  {topicCount > 8 && subject.units.flatMap((u) => u.topics)[8] && (
+                    <Link href={`/study/${subject.units.flatMap((u) => u.topics)[8].topic_id}`}>
+                      <span className="cursor-pointer rounded-full border border-border bg-page px-3 py-1 text-[12px] text-gray-400 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                        +{topicCount - 8} more
+                      </span>
+                    </Link>
                   )}
                 </div>
               </div>
