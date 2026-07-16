@@ -38,16 +38,14 @@ export function Navbar() {
 
         {/* Auth */}
         <div className="flex items-center gap-2">
-          <Link href="/sign-in">
-            <Button variant="outline" size="sm">
-              Sign in
-            </Button>
-          </Link>
-          <Link href="/sign-up">
-            <Button size="sm">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/sign-in">Sign in</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/sign-up">
               Get started <ArrowRight size={13} />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
     </motion.nav>
