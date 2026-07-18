@@ -40,16 +40,16 @@ export function Hero() {
           </motion.p>
 
           <motion.div {...fadeUp(0.3)} className="mt-8 flex flex-wrap gap-3">
-            <Link href="/upload">
-              <Button size="lg">
+            <Button asChild size="lg">
+              <Link href="/upload">
                 <Upload size={16} /> Upload syllabus — free
-              </Button>
-            </Link>
-            <a href="#features">
-              <Button size="lg" variant="outline">
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <a href="#features">
                 <Video size={15} /> See how it works
-              </Button>
-            </a>
+              </a>
+            </Button>
           </motion.div>
 
           {/* Stats */}

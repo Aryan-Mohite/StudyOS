@@ -40,12 +40,12 @@ export default async function DashboardPage() {
             notes, MCQs, numericals, and a scoped AI tutor.
           </p>
         </div>
-        <Link href="/upload">
-          <Button size="lg">
+        <Button asChild size="lg">
+          <Link href="/upload">
             <Upload size={16} />
             Upload your syllabus
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -144,11 +144,11 @@ export default async function DashboardPage() {
                   {(() => {
                     const firstTopic = subject.units.flatMap((u) => u.topics)[0];
                     return firstTopic ? (
-                      <Link href={`/study/${firstTopic.topic_id}`}>
-                        <Button size="sm" variant="outline" className="text-[12px]">
+                      <Button asChild size="sm" variant="outline" className="text-[12px]">
+                        <Link href={`/study/${firstTopic.topic_id}`}>
                           Start Studying <ArrowRight size={12} />
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                     ) : null;
                   })()}
                 </div>
