@@ -139,45 +139,15 @@ export interface MCQSet {
 
 // ─────────────────────────────────────────
 // STUDY PLAN
+//
+// No shared type here — the Study Plan contract (study_plan_id, days[]
+// with session_type/topics/focus_note) lives in
+// AgenticService/App/agents/study_plan_agent.py and is consumed directly
+// via a local interface in app/(dashboard)/plan/page.tsx. An earlier
+// weeks/days/tasks-shaped draft used to live here; it never matched what
+// the backend actually returns and nothing imported it, so it's been
+// removed rather than left to mislead the next person who reaches for it.
 // ─────────────────────────────────────────
-
-export type TaskType = "study" | "revise" | "practice" | "mock_test";
-export type Priority = "high" | "medium" | "low";
-
-export interface StudyTask {
-  task_id: string;
-  topic_id: string;
-  subject: string;
-  topic: string;
-  duration_minutes: number;
-  task_type: TaskType;
-  priority: Priority;
-  notes: string | null;
-}
-
-export interface StudyDay {
-  date: string; // YYYY-MM-DD
-  day_label: string;
-  is_buffer: boolean;
-  tasks: StudyTask[];
-}
-
-export interface StudyWeek {
-  week_number: number;
-  theme: string;
-  days: StudyDay[];
-}
-
-export interface StudyPlan {
-  plan_id: string;
-  syllabus_id: string;
-  exam_date: string; // YYYY-MM-DD
-  generated_at: string; // ISO 8601
-  total_days: number;
-  total_topics: number;
-  daily_hours: number;
-  weeks: StudyWeek[];
-}
 
 // ─────────────────────────────────────────
 // CHAT / AI TUTOR
@@ -245,16 +215,6 @@ export type MCQState =
   | "empty"
   | "regenerating";
 
-export type StudyPlanState =
-  | "idle"
-  | "loading"
-  | "success"
-  | "regenerating"
-  | "error"
-  | "empty"
-  | "task_complete"
-  | "day_complete";
-
 export type ChatState =
   | "idle"
   | "typing"
@@ -280,5 +240,4 @@ export interface FeatureState<TData, TState extends string> {
 export type NotesFeatureState = FeatureState<Note, NotesState>;
 export type NumericalsFeatureState = FeatureState<NumericalSet, NumericalsState>;
 export type MCQFeatureState = FeatureState<MCQSet, MCQState>;
-export type StudyPlanFeatureState = FeatureState<StudyPlan, StudyPlanState>;
 export type ChatFeatureState = FeatureState<TutorResponse[], ChatState>;

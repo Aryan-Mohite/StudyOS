@@ -3,11 +3,11 @@ main.py — StudyOS AgenticService
 Pure AI layer: PDF parsing, notes/MCQ/numericals generation, tutor chat.
 No database. No caching. That's the Express layer's job.
 
-Notes, Tutor Chat, MCQ, and Numericals all delegate to a LangGraph workflow
-in App/workflows/ (genuine multi-step: generate+index, retrieve+generate,
-generate+validate+repair). Syllabus parsing calls its agent in App/agents/
-directly — see App/workflows/README.md for why. See ARCHITECTURE.md for
-the full request flow.
+Notes, Tutor Chat, MCQ, Numericals, Study Plan, and Syllabus parsing all
+delegate to a LangGraph workflow in App/workflows/ (genuine multi-step:
+generate+index, retrieve+generate, generate+validate+repair). See
+App/workflows/README.md for the full breakdown and ARCHITECTURE.md for the
+full request flow.
 """
 
 import os
@@ -21,17 +21,17 @@ from pydantic import BaseModel
 
 from config import settings
 from App.services.pdf_service import extract_pdf_text
-from App.agents.syllabus_agent import run_syllabus_parse
 from App.workflows.mcq_workflow import run_mcq_generation
 from App.workflows.notes_workflow import run_notes_generation
 from App.workflows.numericals_workflow import run_numericals_generation
 from App.workflows.reference_material_workflow import run_reference_ingestion
 from App.workflows.study_plan_workflow import run_study_plan_generation
+from App.workflows.syllabus_workflow import run_pdf_analysis
 from App.workflows.tutor_workflow import run_tutor_turn
 
 app = FastAPI(
     title="StudyOS AgenticService",
-    description="Internal AI service — not exposed directly to browser clients. Called only by the Next.js API routes / Express gateway.",
+    description="Internal AI service — not exposed directly to browser clients. Called only by the Next.js API routes.",
     version="2.0.0",
 )
 
@@ -90,7 +90,7 @@ async def agent_parse_syllabus(
         )
 
     try:
-        parsed = run_syllabus_parse(raw_text, filename or file.filename)
+        parsed = run_pdf_analysis(raw_text, filename or file.filename)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

@@ -6,7 +6,8 @@ into the structured syllabus contract via Claude (through llm_service).
 Agent-level logic only — pure LLM call + Pydantic-shaped dict in, dict out.
 Orchestration (quality-check/repair loop) lives in
 App/workflows/syllabus_workflow.py, same split as mcq_agent/mcq_workflow and
-study_plan_agent/study_plan_workflow.
+study_plan_agent/study_plan_workflow. main.py calls that workflow's
+run_pdf_analysis, not run_syllabus_parse below directly.
 """
 
 import json
@@ -194,5 +195,7 @@ def run_syllabus_parse(raw_text: str, filename: str) -> dict:
     scripts) that want the raw single-shot parse without the workflow's
     validate/repair pass. main.py calls the PDF Analysis Agent's workflow
     entry point instead: App/workflows/syllabus_workflow.py's
-    run_pdf_analysis, see that module's docstring for why."""
+    run_pdf_analysis, which wraps this same parse_syllabus() call with a
+    quality-validation + one-shot repair pass. See that module's docstring
+    for the full rationale."""
     return parse_syllabus(raw_text, filename)

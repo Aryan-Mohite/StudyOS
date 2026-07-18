@@ -123,7 +123,7 @@ export async function deleteMCQ(topicId: string): Promise<void> {
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 export async function checkHealth(): Promise<{ status: string; version: string }> {
-  return request("/health");
+  return request("/api/health");
 }
 
 // ─── Numericals ─────────────────────────────────────────────────────────────────
