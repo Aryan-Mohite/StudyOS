@@ -9,7 +9,22 @@
  * routes into a separately-deployed service (default: same origin, "").
  */
 
-import type { Syllabus, Note, MCQSet, NumericalSet, TutorResponse, ChatMessage } from "@/types";
+import type {
+  Syllabus,
+  Note,
+  MCQSet,
+  NumericalSet,
+  TutorResponse,
+  ChatMessage,
+  AttemptSubmitInput,
+  AttemptRollup,
+  TopicMastery,
+  RevisionItem,
+  DailyGoal,
+  WeeklyGoal,
+  DashboardAnalytics,
+  SuggestedDifficulty,
+} from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -174,6 +189,56 @@ export async function sendChatMessage(input: SendChatMessageInput): Promise<Tuto
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+// ─── Personalized Learning ──────────────────────────────────────────────────
+
+export async function submitAttempt(input: AttemptSubmitInput): Promise<AttemptRollup> {
+  return request<AttemptRollup>("/api/attempts/submit", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getProgress(): Promise<{ topics: TopicMastery[]; overall_accuracy: number | null; total_attempts: number }> {
+  return request("/api/progress");
+}
+
+export async function getDailyGoal(): Promise<DailyGoal> {
+  return request<DailyGoal>("/api/goals/daily");
+}
+
+export async function updateDailyGoal(targetQuestions: number): Promise<DailyGoal> {
+  return request<DailyGoal>("/api/goals/daily", {
+    method: "POST",
+    body: JSON.stringify({ target_questions: targetQuestions }),
+  });
+}
+
+export async function getWeeklyGoal(): Promise<WeeklyGoal> {
+  return request<WeeklyGoal>("/api/goals/weekly");
+}
+
+export async function updateWeeklyGoal(targetTopics: number): Promise<WeeklyGoal> {
+  return request<WeeklyGoal>("/api/goals/weekly", {
+    method: "POST",
+    body: JSON.stringify({ target_topics: targetTopics }),
+  });
+}
+
+export async function getRevisionSchedule(): Promise<{ items: RevisionItem[] }> {
+  return request("/api/revision");
+}
+
+export async function getDashboardAnalytics(): Promise<DashboardAnalytics> {
+  return request<DashboardAnalytics>("/api/analytics/dashboard");
+}
+
+export async function getSuggestedDifficulty(topicId: string): Promise<SuggestedDifficulty> {
+  const res = await request<{ suggested_difficulty: SuggestedDifficulty }>(
+    `/api/mcq/suggested-difficulty?topic_id=${encodeURIComponent(topicId)}`,
+  );
+  return res.suggested_difficulty;
 }
 
 export { APIError };

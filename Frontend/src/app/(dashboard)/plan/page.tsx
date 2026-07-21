@@ -5,6 +5,7 @@ import { Calendar, ListChecks, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState, IdleGenerateCard } from "@/components/StateComponents";
 import { LoadingSteps } from "@/components/LoadingSteps";
+import { GoalsPanel } from "@/components/GoalsPanel";
 
 interface PlanTopic {
   topic_id: string;
@@ -113,6 +114,8 @@ export default function PlanPage() {
           Day-by-day scheduling based on your syllabus
         </p>
       </div>
+
+      <GoalsPanel />
 
       {syllabusLoading ? (
         <LoadingSteps currentStep="Loading your syllabus" completedSteps={[]} />

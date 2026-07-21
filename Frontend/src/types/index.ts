@@ -150,6 +150,69 @@ export interface MCQSet {
 // ─────────────────────────────────────────
 
 // ─────────────────────────────────────────
+// PERSONALIZED LEARNING
+// ─────────────────────────────────────────
+
+export interface AttemptSubmitInput {
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  syllabus_id?: string;
+  content_type: "mcq" | "numerical";
+  difficulty: "easy" | "medium" | "hard";
+  is_correct: boolean;
+}
+
+export interface AttemptRollup {
+  mastery_score: number;
+  total_attempts: number;
+  correct_attempts: number;
+  next_review_date: string; // YYYY-MM-DD
+}
+
+export interface TopicMastery {
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  total_attempts: number;
+  correct_attempts: number;
+  mastery_score: number; // 0-100
+  last_attempted_at: string;
+}
+
+export interface RevisionItem {
+  topic_id: string;
+  topic_name: string;
+  subject: string;
+  next_review_date: string; // YYYY-MM-DD
+  overdue: boolean;
+}
+
+export interface DailyGoal {
+  goal_date: string;
+  target_questions: number;
+  completed_questions: number;
+}
+
+export interface WeeklyGoal {
+  week_start: string;
+  target_topics: number;
+  completed_topics: number;
+}
+
+export interface DashboardAnalytics {
+  streak_days: number;
+  daily_goal: DailyGoal;
+  weekly_goal: WeeklyGoal;
+  weak_topics: TopicMastery[]; // lowest mastery first, capped server-side
+  upcoming_revisions: RevisionItem[];
+  overall_accuracy: number | null; // 0-100, null if no attempts yet
+  total_attempts: number;
+}
+
+export type SuggestedDifficulty = "easy" | "medium" | "hard" | "mixed";
+
+// ─────────────────────────────────────────
 // CHAT / AI TUTOR
 // ─────────────────────────────────────────
 

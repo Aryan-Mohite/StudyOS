@@ -1,111 +1,120 @@
-# StudyOS — fixes from full codebase audit (2026-07-18)
+# Personalized Learning — Changes
 
-Extract this zip into your repo root — paths mirror the repo exactly.
-7 files changed, 0 new files, 0 deleted files. Both layers verified clean
-after applying these changes: `npx tsc --noEmit` (TypeScript) and
-`python3 -m py_compile` (all AgenticService `.py` files).
+Delivered as changed/new files only, paths mirror the repo root. Extract over
+your working copy of `StudyOS/`.
 
----
+Built against a fresh clone of `github.com/Aryan-Mohite/StudyOS` (main), read
+before writing per usual. Verified with `npx tsc --noEmit` (clean) and
+`npx next build` (compiles + lints clean; the prerender error you may see
+locally if you build with a dummy Clerk key is unrelated to these changes —
+it's Clerk rejecting a fake publishable key, not a bug in this code).
 
-## 1. `Frontend/next.config.ts` — removed dead Express rewrite (real bug)
+## The core problem this closes
 
-The old `rewrites()` block proxied every `/api/*` request to
-`http://localhost:3001` — a leftover from the pre-rebuild Express gateway,
-which `ARCHITECTURE.md` already documents as removed.
+Nothing in the app recorded whether a student got an MCQ or numerical right.
+`mcq_sets` / `numerical_sets` only ever stored generated question content.
+Without an attempt record, weak-topic detection, a progress tracker,
+dashboard analytics, and revision scheduling had no data to work from — they
+were impossible to build honestly. Everything below exists to close that gap
+and then build the requested features on top of it.
 
-**Impact:** Next.js applies array-form `rewrites()` as `afterFiles` —
-checked after static routes but before dynamic ones. Your static API paths
-(`/api/upload`, `/api/notes/generate`, `/api/chat`, etc.) were unaffected,
-but the three dynamic routes — `/api/notes/[topicId]`,
-`/api/mcq/[topicId]`, `/api/numericals/[topicId]` (GET + DELETE) — were
-silently hijacked to a server that doesn't exist. In practice this meant
-every "Regenerate" button's cache-delete step (`deleteNotes`/`deleteMCQ`/
-`deleteNumericals`) was silently failing (caught by a swallowed try/catch),
-leaving stale rows to pile up in `notes`/`mcq_sets`/`numerical_sets` on
-every regeneration. Not user-visible today only because regeneration also
-passes `force_regenerate: true`, which bypasses the cache lookup anyway —
-but it was a live trap for anything that ever relied on those routes
-working (e.g. the unused `getNotes`/`getMCQ`/`getNumericals` GET helpers).
+## Scope decision: no AgenticService / LangGraph involvement
 
-**Fix:** removed the `rewrites()` block entirely.
+Mastery scoring, streaks, spaced-repetition scheduling, and weak-topic
+detection are deterministic aggregation over MySQL rows — no LLM call is
+involved anywhere in this feature. Consistent with the project's existing
+"LangGraph only when genuinely multi-step" and infra-leanness principles, I
+kept all of it in Next.js Route Handlers reading/writing MySQL directly. The
+Python layer is untouched.
 
-## 2. `Frontend/src/middleware.ts` — API routes now require auth
+## New DB tables (`Frontend/src/lib/db.ts`)
 
-Previously `isProtectedRoute` only matched page routes
-(`/dashboard`, `/upload`, `/plan`, `/study`, `/profile`). Every `/api/**`
-route handler was reachable anonymously and fell back to a shared
-`"dev-user-01"` identity on `auth()` returning null — meaning any
-unauthenticated caller could hit LLM-calling endpoints (notes/MCQ/
-numericals/plan generation, tutor chat, syllabus upload) for free, with
-their data landing in one shared bucket alongside every other
-unauthenticated caller.
+- **`attempts`** — one row per graded interaction (MCQ answer or numerical
+  self-assessment): user, topic, subject, content_type, difficulty,
+  is_correct, timestamp.
+- **`topic_mastery`** — per-user-per-topic rollup (`total_attempts`,
+  `correct_attempts`, `mastery_score` 0–100), updated on every attempt via a
+  single `ON DUPLICATE KEY UPDATE` so reads never scan raw attempts.
+- **`revision_schedule`** — simplified SM-2-style spaced repetition: correct
+  answers double the interval (capped at 30 days), incorrect answers reset it
+  to 1 day. Read-then-write rather than pure SQL, because doubling needs the
+  previous interval — fine at this write volume (one row per answered
+  question), no queue/worker introduced.
+- **`daily_goals`** / **`weekly_goals`** — target + completed counters,
+  keyed by `(user_id, date)` / `(user_id, week_start)`.
 
-**Fix:** extended `isProtectedRoute` to also match `/api/upload`,
-`/api/notes`, `/api/mcq`, `/api/numericals`, `/api/plan`, `/api/chat`, and
-`/api/profile`. `/api/health` stays public (no cost, no per-user data). The
-existing `dev-user-01` fallback code in each route handler was left in
-place as defensive dead code — harmless now that middleware guarantees a
-signed-in user before the handler ever runs.
+All four are additive `CREATE TABLE IF NOT EXISTS` — no migration needed for
+existing installs, same pattern as every other table in this file.
 
-## 3. `AgenticService/main.py` — syllabus parsing now goes through its
-   validate→repair workflow (real bug)
+## New API routes
 
-`App/workflows/syllabus_workflow.py` fully implements the same
-generate → validate quality → repair-once pattern used by MCQ, Numericals,
-and Study Plan (`run_pdf_analysis`, built on `syllabus_agent.py`'s
-`validate_syllabus_quality`/`repair_syllabus`). But `main.py` was calling
-`run_syllabus_parse` directly from `syllabus_agent.py` — the plain
-single-shot version with no quality loop — so that repair path for
-garbled/placeholder-riddled syllabus parses (a real failure mode for OCR'd
-or awkwardly-formatted PDFs) was fully built but never executed. The two
-files' docstrings actively disagreed about which one `main.py` calls.
+| Route | Purpose |
+|---|---|
+| `POST /api/attempts/submit` | Records one attempt, updates mastery + revision schedule + today's goal in one call |
+| `GET /api/progress` | Full per-topic mastery list, weakest first, for `/progress` |
+| `GET/POST /api/goals/daily` | Read/update today's question target |
+| `GET/POST /api/goals/weekly` | Read/update this week's topic target |
+| `GET /api/revision` | Topics due for spaced revision in the next 7 days |
+| `GET /api/analytics/dashboard` | Combined read (streak, goals, weak topics, revisions) for the dashboard widgets, one request instead of five |
+| `GET /api/mcq/suggested-difficulty?topic_id=` | Suggests easy/medium/hard from the student's own accuracy on that topic — a hint only |
 
-**Fix:** `main.py` now imports and calls `run_pdf_analysis` from
-`App/workflows/syllabus_workflow.py` instead of `run_syllabus_parse`. No
-request/response contract change — same input (`raw_text`, `filename`),
-same output shape.
+All Clerk-authenticated, same `auth()` + 401 pattern as `/api/profile`.
 
-## 4. `AgenticService/App/agents/syllabus_agent.py` — docstring fix
+## Difficulty-based MCQs — kept manual, per your call
 
-Updated the module docstring and `run_syllabus_parse`'s docstring so they
-correctly describe `main.py`'s actual behavior post-fix, instead of
-contradicting each other about which entry point is live.
+`suggested-difficulty` never overrides the student's manual selection in
+`MCQQuiz.tsx`. It just surfaces a small badge ("you might be ready for hard
+questions") above the Start Quiz button once there are ≥3 prior attempts on
+that topic. Below 3 attempts it shows nothing rather than guessing.
 
-## 5. `AgenticService/App/workflows/README.md` — doc fix
+## UI changes
 
-This file claimed "syllabus parsing is still a single LLM-call-in,
-JSON-out operation... so it stays a plain function," which was already
-false the day `syllabus_workflow.py` was added, and never mentioned
-`study_plan_workflow.py` at all. Rewrote the module list to include both,
-and correctly describe how `main.py` calls syllabus parsing now.
+- **`MCQQuiz.tsx`** — `handleAnswer` now fires `submitAttempt()`
+  (fire-and-forget; a failed write never blocks or interrupts the quiz).
+  Suggested-difficulty badge added to the idle state.
+- **`NumericalsView.tsx`** — numericals are self-checked (no multiple choice
+  to grade automatically), so I added "Got it / Needs review" buttons under
+  each solved problem. This is a softer signal than MCQ correctness but still
+  feeds weak-topic detection — flagging this as a judgment call in case you'd
+  rather numericals stay purely read-only.
+- **New `/progress` page** — per-subject mastery breakdown with color-coded
+  bars (red <40%, amber <70%, green ≥70%), correct/total counts, links back
+  into `/study/[topicId]`.
+- **New `GoalsPanel`** (added to `/plan`) — inline-editable daily/weekly
+  goal targets with progress bars, plus the upcoming revision queue.
+- **New `DashboardAnalyticsPanel`** (added to `/dashboard`) — streak, today's
+  goal ring, overall accuracy, weak-topic count, and expanded weak-topics +
+  revisions lists when either is non-empty. Client-fetched so it can't block
+  the server-rendered syllabus content, and fails silently (renders nothing)
+  rather than breaking the dashboard if analytics can't load — same
+  best-effort posture as the rest of the widget.
+- **`AppNavbar.tsx`** — added a "Progress" link.
 
-## 6. `Frontend/src/lib/api.ts` — fixed `checkHealth()` path
+## Files touched
 
-Was requesting `/health`, which doesn't exist — the actual route is
-`/api/health` (`Frontend/src/app/api/health/route.ts`). This function is
-currently unused anywhere in the app, so it was a dormant bug; fixed it
-anyway so it works correctly if/when something calls it.
+**Modified:**
+`lib/db.ts`, `types/index.ts`, `lib/api.ts`, `components/MCQQuiz.tsx`,
+`components/NumericalsView.tsx`, `components/AppNavbar.tsx`,
+`app/(dashboard)/dashboard/page.tsx`, `app/(dashboard)/plan/page.tsx`
 
-## 7. `Frontend/src/types/index.ts` — removed stale, unused `StudyPlan`
-   type shape
+**New:**
+`app/api/attempts/submit/route.ts`, `app/api/progress/route.ts`,
+`app/api/goals/daily/route.ts`, `app/api/goals/weekly/route.ts`,
+`app/api/revision/route.ts`, `app/api/analytics/dashboard/route.ts`,
+`app/api/mcq/suggested-difficulty/route.ts`,
+`components/DashboardAnalytics.tsx`, `components/GoalsPanel.tsx`,
+`app/(dashboard)/progress/page.tsx`
 
-An earlier contract draft (`StudyPlan`/`StudyWeek`/`StudyDay`/`StudyTask`/
-`TaskType`/`Priority`, weeks→days→tasks nesting) never matched what the
-backend actually returns (`study_plan_id`, flat `days[]` with
-`session_type`/`topics`/`focus_note` — see
-`AgenticService/App/agents/study_plan_agent.py`). Nothing in the app
-imported these types — `app/(dashboard)/plan/page.tsx` defines its own
-local interface matching the real contract instead. Removed the stale
-types (and the now-dangling `StudyPlanState`/`StudyPlanFeatureState` that
-depended on them) so nobody reaches for the wrong shape later. Verified
-with a repo-wide grep before removal that nothing else imports any of
-these names.
+## Left open — needs your call, not fixed silently
 
----
-
-### Not fixed (flagged only, needs a product decision)
-
-- The `dev-user-01` fallback pattern still exists in every API route
-  handler's code as a defensive no-op. With middleware now enforcing auth
-  on those routes, it should never trigger — but if you want it removed
-  outright rather than left dormant, that's a quick follow-up.
+- **Numericals self-assessment is honesty-based**, not verified. It's
+  directionally useful for weak-topic detection but noisier than MCQ signal.
+  If you'd rather keep numericals purely read-only and rely on MCQ alone for
+  mastery, that's a small revert (drop the two handlers + button block in
+  `NumericalsView.tsx`).
+- **No backfill** — mastery/streaks start from zero for every existing user
+  on deploy; there's no history to reconstruct since nothing was tracked
+  before this.
+- **`dev-user-01` fallback** — untouched, same as before. Not relevant here
+  since every new route requires real Clerk auth, but noting it's still
+  pending your removal decision from the last audit.

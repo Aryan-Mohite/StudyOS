@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import { Calculator, ChevronDown, ChevronUp, Zap } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp, Zap, Check, X } from "lucide-react";
 import type { NumericalSet, NumericalsState } from "@/types";
-import { generateNumericals, deleteNumericals, APIError } from "@/lib/api";
+import { generateNumericals, deleteNumericals, submitAttempt, APIError } from "@/lib/api";
 import { LoadingSteps } from "@/components/LoadingSteps";
 import { EmptyState, ErrorState, StaleWarning, FormulaBlock, IdleGenerateCard } from "@/components/StateComponents";
 
@@ -41,6 +41,7 @@ export function NumericalsView({
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [wasCached, setWasCached] = useState(false);
+  const [selfMarked, setSelfMarked] = useState<Record<number, "correct" | "incorrect">>({});
   const [currentStep, setCurrentStep] = useState("");
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
 
@@ -87,6 +88,23 @@ export function NumericalsView({
   const handleRegenerate = async () => {
     try { await deleteNumericals(topicId); } catch { /* ignore if not cached */ }
     await generate(true);
+  };
+
+  // Numericals are self-checked against the worked solution rather than
+  // multiple-choice, so "correctness" here is the student's own honest
+  // report — still a useful weak-topic signal, just a softer one than MCQ.
+  const handleSelfMark = (problemId: number, difficulty: "easy" | "medium" | "hard", isCorrect: boolean) => {
+    if (selfMarked[problemId]) return;
+    setSelfMarked((prev) => ({ ...prev, [problemId]: isCorrect ? "correct" : "incorrect" }));
+    submitAttempt({
+      topic_id: topicId,
+      topic_name: topicName,
+      subject,
+      syllabus_id: syllabusId,
+      content_type: "numerical",
+      difficulty,
+      is_correct: isCorrect,
+    }).catch(() => { /* progress tracking is best-effort */ });
   };
 
   if (!hasNumericals && status === "idle") {
@@ -228,6 +246,29 @@ export function NumericalsView({
                     <span className="text-[14px] font-semibold text-emerald-800">{problem.answer}</span>
                   </div>
                 </div>
+
+                {/* Self-assessment — feeds weak-topic detection */}
+                {selfMarked[problem.id] ? (
+                  <p className="text-center text-[12px] text-gray-400">
+                    Marked as {selfMarked[problem.id] === "correct" ? "solved correctly" : "needs review"} — thanks!
+                  </p>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-[12px] text-gray-500 mr-1">Did you solve it correctly?</span>
+                    <button
+                      onClick={() => handleSelfMark(problem.id, problem.difficulty, true)}
+                      className="flex items-center gap-1 rounded-full border border-emerald-200 bg-white px-3 py-1 text-[12px] font-medium text-emerald-600 hover:bg-emerald-50 transition-colors"
+                    >
+                      <Check size={12} /> Got it
+                    </button>
+                    <button
+                      onClick={() => handleSelfMark(problem.id, problem.difficulty, false)}
+                      className="flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-[12px] font-medium text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <X size={12} /> Needs review
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

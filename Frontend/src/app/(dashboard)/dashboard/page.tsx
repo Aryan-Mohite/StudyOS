@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Upload, Calendar, BookOpen, ArrowRight, Beaker, FileUp } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { SyllabusTree } from "@/components/SyllabusTree";
+import { DashboardAnalyticsPanel } from "@/components/DashboardAnalytics";
 import { Button } from "@/components/ui/button";
 import { getPool, initDb } from "@/lib/db";
 import type { RowDataPacket } from "mysql2";
@@ -78,6 +79,9 @@ export default async function DashboardPage() {
             {syllabus.university} · Semester {syllabus.semester} · {syllabus.subjects.length} subjects
           </p>
         </div>
+
+        {/* Personalized learning analytics */}
+        <DashboardAnalyticsPanel />
 
         {/* Quick stats */}
         <div className="mb-6 grid grid-cols-3 gap-3">

@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
-import { HelpCircle, CheckCircle2, XCircle, RotateCcw, Trophy, Zap } from "lucide-react";
-import type { MCQSet, MCQOption, MCQState } from "@/types";
-import { generateMCQ, deleteMCQ, APIError } from "@/lib/api";
+import { useState, useEffect } from "react";
+import { HelpCircle, CheckCircle2, XCircle, RotateCcw, Trophy, Zap, TrendingUp } from "lucide-react";
+import type { MCQSet, MCQOption, MCQState, SuggestedDifficulty } from "@/types";
+import { generateMCQ, deleteMCQ, submitAttempt, getSuggestedDifficulty, APIError } from "@/lib/api";
 import { LoadingSteps } from "@/components/LoadingSteps";
 import { ErrorState, StaleWarning, IdleGenerateCard } from "@/components/StateComponents";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,16 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
   const [currentStep, setCurrentStep] = useState("");
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [wasCached, setWasCached] = useState(false);
+  const [suggested, setSuggested] = useState<SuggestedDifficulty | null>(null);
+
+  // Fetch a difficulty suggestion based on the student's own accuracy on this
+  // topic — shown as a hint only; they still tap "Start Quiz" themselves and
+  // difficulty selection elsewhere stays manual.
+  useEffect(() => {
+    getSuggestedDifficulty(topicId)
+      .then((d) => setSuggested(d === "mixed" ? null : d))
+      .catch(() => setSuggested(null));
+  }, [topicId]);
 
   const generate = async (forceRegenerate = false) => {
     setStatus(forceRegenerate ? "regenerating" : "loading");
@@ -88,9 +98,21 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
   };
 
   const handleAnswer = (option: MCQOption) => {
-    if (answers[currentIndex] !== undefined) return; // already answered
+    if (answers[currentIndex] !== undefined || !data) return; // already answered
     setAnswers((prev) => ({ ...prev, [currentIndex]: option }));
     setStatus("question_answered");
+
+    const question = data.questions[currentIndex];
+    // Fire-and-forget: recording the attempt shouldn't block or interrupt the quiz.
+    submitAttempt({
+      topic_id: topicId,
+      topic_name: topicName,
+      subject,
+      syllabus_id: syllabusId,
+      content_type: "mcq",
+      difficulty: question.difficulty,
+      is_correct: option === question.correct,
+    }).catch(() => { /* progress tracking is best-effort */ });
   };
 
   const handleNext = () => {
@@ -112,13 +134,21 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
 
   if (status === "idle") {
     return (
-      <IdleGenerateCard
-        label="Start Quiz"
-        description={`${topicName} — 10 questions, mix of easy, medium, and hard.`}
-        estimatedTime="~15–25 seconds"
-        onGenerate={() => generate()}
-        icon={<HelpCircle size={22} />}
-      />
+      <div className="flex flex-col items-center gap-3">
+        <IdleGenerateCard
+          label="Start Quiz"
+          description={`${topicName} — 10 questions, mix of easy, medium, and hard.`}
+          estimatedTime="~15–25 seconds"
+          onGenerate={() => generate()}
+          icon={<HelpCircle size={22} />}
+        />
+        {suggested && (
+          <span className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-medium text-brand-600">
+            <TrendingUp size={11} />
+            Based on your past attempts, you might be ready for {suggested} questions
+          </span>
+        )}
+      </div>
     );
   }
 
