@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Brain, LayoutDashboard, Calendar, Upload, History, TrendingUp } from "lucide-react";
+import { Brain, LayoutDashboard, Calendar, Upload, History, TrendingUp, BookOpen } from "lucide-react";
 import { ProfileBadge } from "@/components/ProfileBadge";
 
 const NAV_LINKS = [
@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: "/progress", label: "Progress", icon: TrendingUp },
   { href: "/history", label: "History", icon: History },
   { href: "/upload", label: "Upload Syllabus", icon: Upload },
+  { href: "/reference", label: "Reference Material", icon: BookOpen },
 ];
 
 export function AppNavbar() {

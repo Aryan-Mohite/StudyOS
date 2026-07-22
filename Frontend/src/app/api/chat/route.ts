@@ -13,8 +13,10 @@ import type { RowDataPacket } from "mysql2";
  */
 export async function GET(req: NextRequest) {
   await initDb();
-  const { userId: clerkUserId } = await auth();
-  const user_id = clerkUserId ?? "dev-user-01";
+  const { userId: user_id } = await auth();
+  if (!user_id) {
+    return NextResponse.json({ detail: "Not signed in." }, { status: 401 });
+  }
 
   const topic_id = req.nextUrl.searchParams.get("topic_id");
   if (!topic_id) {
@@ -55,7 +57,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   await initDb();
-  const { userId: clerkUserId } = await auth();
+  const { userId: user_id } = await auth();
+  if (!user_id) {
+    return NextResponse.json({ detail: "Not signed in." }, { status: 401 });
+  }
+
   const body = await req.json();
   const {
     question,
@@ -64,9 +70,7 @@ export async function POST(req: NextRequest) {
     subject,
     syllabus_context = [],
     syllabus_id,
-    user_id: bodyUserId = "dev-user-01",
   } = body ?? {};
-  const user_id = clerkUserId ?? bodyUserId;
 
   if (!question || !topic_id || !topic_name || !subject) {
     return NextResponse.json(

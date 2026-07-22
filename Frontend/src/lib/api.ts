@@ -24,6 +24,7 @@ import type {
   WeeklyGoal,
   DashboardAnalytics,
   SuggestedDifficulty,
+  ReferenceMaterial,
 } from "@/types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -64,20 +65,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
 
-export async function uploadSyllabus(
-  file: File,
-  userId = "dev-user-01",
-): Promise<Syllabus> {
+export async function uploadSyllabus(file: File): Promise<Syllabus> {
   const form = new FormData();
   form.append("file", file);
-  form.append("user_id", userId);
   return request<Syllabus>("/api/upload", { method: "POST", body: form });
 }
 
-export async function getLatestSyllabus(
-  userId = "dev-user-01",
-): Promise<Syllabus> {
-  return request<Syllabus>(`/api/upload/latest?user_id=${userId}`);
+export async function getLatestSyllabus(): Promise<Syllabus> {
+  return request<Syllabus>("/api/upload/latest");
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
@@ -169,6 +164,24 @@ export async function getNumericals(topicId: string): Promise<NumericalSet> {
 
 export async function deleteNumericals(topicId: string): Promise<void> {
   await request<void>(`/api/numericals/${topicId}`, { method: "DELETE" });
+}
+
+// ─── Reference material ─────────────────────────────────────────────────────
+
+export async function uploadReferenceMaterial(
+  syllabusId: string,
+  file: File,
+): Promise<{ id: string; filename: string; chunks_indexed: number }> {
+  const form = new FormData();
+  form.append("syllabus_id", syllabusId);
+  form.append("file", file);
+  return request("/api/reference", { method: "POST", body: form });
+}
+
+export async function getReferenceMaterials(
+  syllabusId: string,
+): Promise<{ materials: ReferenceMaterial[] }> {
+  return request(`/api/reference?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
 // ─── AI Tutor Chat ────────────────────────────────────────────────────────────

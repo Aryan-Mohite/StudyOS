@@ -12,8 +12,10 @@ import type { RowDataPacket } from "mysql2";
  */
 export async function GET(_req: NextRequest) {
   await initDb();
-  const { userId: clerkUserId } = await auth();
-  const user_id = clerkUserId ?? "dev-user-01";
+  const { userId: user_id } = await auth();
+  if (!user_id) {
+    return NextResponse.json({ detail: "Not signed in." }, { status: 401 });
+  }
 
   const pool = getPool();
   const [rows] = await pool.query<RowDataPacket[]>(

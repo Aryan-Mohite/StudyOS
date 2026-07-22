@@ -10,12 +10,13 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB — same limit as the old multe
 export async function POST(req: NextRequest) {
   await initDb();
 
-  const { userId: clerkUserId } = await auth();
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ detail: "Not signed in." }, { status: 401 });
+  }
+
   const form = await req.formData();
   const file = form.get("file");
-  // Prefer the authenticated Clerk user; fall back to the form field (or
-  // dev-user-01) only if this route is ever hit outside Clerk middleware.
-  const userId = clerkUserId ?? (form.get("user_id") as string) ?? "dev-user-01";
 
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ detail: "No PDF file provided." }, { status: 400 });

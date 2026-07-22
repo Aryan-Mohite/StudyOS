@@ -32,8 +32,10 @@ export async function POST(req: NextRequest) {
   }
 
   const pool = getPool();
-  const { userId: clerkUserId } = await auth();
-  const userId = clerkUserId ?? "dev-user-01";
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ detail: "Not signed in." }, { status: 401 });
+  }
 
   // ── Cache check — a plan is keyed on (user, syllabus, exam date); a new
   // exam date invalidates the previous plan rather than reusing it. ──────────

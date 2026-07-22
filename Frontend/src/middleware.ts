@@ -8,6 +8,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 // back to a shared "dev-user-01" identity, so unauthenticated callers could
 // hit LLM-calling endpoints (notes/mcq/numericals/plan generation, tutor
 // chat, upload) for free and have their data land in one shared bucket.
+// That fallback has since been removed everywhere (routes now return 401
+// if somehow reached without a session) — this matcher list is what makes
+// that safe to rely on.
 // Gate every API route that costs money or touches per-user data; leave
 // /api/health public since it does neither.
 const isProtectedRoute = createRouteMatcher([
@@ -16,6 +19,7 @@ const isProtectedRoute = createRouteMatcher([
   "/plan(.*)",
   "/study(.*)",
   "/profile(.*)",
+  "/reference(.*)",
   "/api/upload(.*)",
   "/api/notes(.*)",
   "/api/mcq(.*)",
@@ -23,6 +27,7 @@ const isProtectedRoute = createRouteMatcher([
   "/api/plan(.*)",
   "/api/chat(.*)",
   "/api/profile(.*)",
+  "/api/reference(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

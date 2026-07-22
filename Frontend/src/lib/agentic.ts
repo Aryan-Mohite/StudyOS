@@ -52,6 +52,25 @@ export async function parseSyllabus(file: File): Promise<unknown> {
   return handle(res);
 }
 
+/** Forwards one raw reference PDF (textbook chapter, lecture notes, etc.) to /agent/ingest-reference-material. */
+export async function ingestReferenceMaterial(
+  syllabusId: string,
+  file: File,
+): Promise<{ filename: string; chunks_indexed: number; text_length: number }> {
+  const form = new FormData();
+  form.append("syllabus_id", syllabusId);
+  form.append("file", file, file.name);
+
+  const res = await fetch(`${AGENTIC}/agent/ingest-reference-material`, {
+    method: "POST",
+    body: form,
+    // Same budget as syllabus parsing — covers the OCR fallback path for
+    // scanned reference PDFs plus embedding/indexing time.
+    signal: AbortSignal.timeout(210_000),
+  });
+  return handle(res);
+}
+
 export interface GenerateNotesPayload {
   topic_id: string;
   topic_name: string;

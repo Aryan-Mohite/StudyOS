@@ -58,6 +58,14 @@ export interface Syllabus {
   subjects: SyllabusSubject[];
 }
 
+/** One student-uploaded textbook/lecture PDF indexed for a syllabus (see /api/reference). */
+export interface ReferenceMaterial {
+  id: string;
+  filename: string;
+  chunks_indexed: number;
+  created_at: string;
+}
+
 // ─────────────────────────────────────────
 // NOTES
 // ─────────────────────────────────────────

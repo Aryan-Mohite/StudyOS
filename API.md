@@ -18,9 +18,9 @@ testing of the Python layer in isolation.
 ## 1. Next.js API (called by the browser)
 
 Base URL: your Next.js deployment, e.g. `http://localhost:3000`.
-Auth: Clerk session cookie. Routes that read `auth()` fall back to a
-`dev-user-01` placeholder user only when no Clerk session is present
-(local dev convenience — do not rely on this in production).
+Auth: Clerk session cookie, enforced by `middleware.ts` on every route below —
+requests without a valid session get a redirect (pages) or `401` (API
+routes) before the handler runs.
 
 ### Syllabus
 
@@ -90,6 +90,22 @@ on this topic, oldest first — used to resume a chat.
 Lists every topic the current user has chatted about, newest-first, with a
 preview of the last message — powers the browsable chat-history page.
 - 200 → `{ sessions: [{ topic_id, topic_name, subject, message_count, last_message_at, last_message_preview }] }`
+
+### Reference Material
+
+**`POST /api/reference`**
+Uploads one textbook/lecture PDF, indexes it into that syllabus's Chroma
+collection via the AgenticService, and records the filename in MySQL.
+Optional — Notes/MCQ/Numericals generation works fine with nothing
+uploaded; it just answers from trained knowledge instead of grounding in
+your material (`grounded_in_reference: false` on those responses).
+- Body: `multipart/form-data`, fields `file` (PDF, ≤10 MB) and `syllabus_id`
+- 200 → `{ id, filename, chunks_indexed, text_length }`
+- 400 → missing/non-PDF/oversized file or missing `syllabus_id` · 502 → extraction/indexing failed
+
+**`GET /api/reference?syllabus_id=...`**
+Lists files already uploaded for a syllabus, newest first.
+- 200 → `{ materials: [{ id, filename, chunks_indexed, created_at }] }`
 
 ### Profile
 

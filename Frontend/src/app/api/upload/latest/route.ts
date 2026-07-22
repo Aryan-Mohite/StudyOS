@@ -4,12 +4,13 @@ import { getPool, initDb } from "@/lib/db";
 import type { RowDataPacket } from "mysql2";
 
 // ── GET /api/upload/latest ────────────────────────────────────────────────────
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   await initDb();
 
-  const { userId: clerkUserId } = await auth();
-  const userId =
-    clerkUserId ?? req.nextUrl.searchParams.get("user_id") ?? "dev-user-01";
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ detail: "Not signed in." }, { status: 401 });
+  }
   const pool = getPool();
 
   const [rows] = await pool.query<RowDataPacket[]>(

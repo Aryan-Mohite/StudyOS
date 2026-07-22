@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS notebooks (
 
 CREATE TABLE IF NOT EXISTS syllabi (
   id           VARCHAR(64) PRIMARY KEY,
-  user_id      VARCHAR(128) NOT NULL DEFAULT 'dev-user-01',
+  user_id      VARCHAR(128) NOT NULL,
   notebook_id  VARCHAR(64),
   filename     VARCHAR(512),
   raw_text     LONGTEXT,
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS numerical_sets (
 
 CREATE TABLE IF NOT EXISTS study_plans (
   id           VARCHAR(64) PRIMARY KEY,
-  user_id      VARCHAR(128) NOT NULL DEFAULT 'dev-user-01',
+  user_id      VARCHAR(128) NOT NULL,
   syllabus_id  VARCHAR(64) NOT NULL,
   exam_date    DATE NOT NULL,
   content_json LONGTEXT NOT NULL,
@@ -193,6 +193,22 @@ CREATE TABLE IF NOT EXISTS weekly_goals (
   completed_topics    INT NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, week_start)
 );
+
+-- ── Reference material ───────────────────────────────────────────────────
+-- The AgenticService indexes the actual PDF text into a per-syllabus Chroma
+-- collection (see App/services/rag_service.py) — this table is just the
+-- MySQL-side record of *which* files were uploaded, so the UI can list them
+-- back to the student without re-querying the vector store.
+
+CREATE TABLE IF NOT EXISTS reference_materials (
+  id             VARCHAR(64) PRIMARY KEY,
+  user_id        VARCHAR(128) NOT NULL,
+  syllabus_id    VARCHAR(64) NOT NULL,
+  filename       VARCHAR(512) NOT NULL,
+  chunks_indexed INT NOT NULL DEFAULT 0,
+  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_reference_materials_syllabus (syllabus_id)
+);
 `;
 
 let _initialized = false;
@@ -243,6 +259,22 @@ async function migrateSchema(pool: mysql.Pool): Promise<void> {
       await pool.query(`ALTER TABLE syllabi ADD INDEX idx_syllabi_notebook (notebook_id)`);
     } catch {
       /* index already present — ignore */
+    }
+  }
+
+  // Every route that writes user_id now requires a real Clerk session (see
+  // middleware.ts) — the "dev-user-01" placeholder default is dead. Drop it
+  // from installs that were created before this schema was tightened; a
+  // fresh CREATE TABLE IF NOT EXISTS above already omits it, but that clause
+  // does nothing to a table that already exists.
+  for (const table of ["syllabi", "study_plans"] as const) {
+    const [defaultRows] = await pool.query<mysql.RowDataPacket[]>(
+      `SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'user_id'`,
+      [dbName, table],
+    );
+    if (defaultRows[0]?.COLUMN_DEFAULT === "dev-user-01") {
+      await pool.query(`ALTER TABLE ${table} ALTER COLUMN user_id DROP DEFAULT`);
     }
   }
 }
@@ -535,6 +567,47 @@ export async function getTopicMastery(userId: string): Promise<TopicMasteryRow[]
     ...r,
     mastery_score: Number(r.mastery_score),
   }));
+}
+
+export interface ReferenceMaterial {
+  id: string;
+  filename: string;
+  chunks_indexed: number;
+  created_at: string;
+}
+
+/**
+ * Records one successfully-ingested reference file. Call after the
+ * AgenticService confirms indexing (see /api/reference/route.ts) — this
+ * table is a listing convenience only, the vector store is the source of
+ * truth for retrieval.
+ */
+export async function insertReferenceMaterial(input: {
+  id: string;
+  userId: string;
+  syllabusId: string;
+  filename: string;
+  chunksIndexed: number;
+}): Promise<void> {
+  await initDb();
+  const pool = getPool();
+  await pool.query(
+    `INSERT INTO reference_materials (id, user_id, syllabus_id, filename, chunks_indexed)
+     VALUES (?, ?, ?, ?, ?)`,
+    [input.id, input.userId, input.syllabusId, input.filename, input.chunksIndexed],
+  );
+}
+
+/** Newest first — for listing what a student has already uploaded for a syllabus. */
+export async function getReferenceMaterials(syllabusId: string): Promise<ReferenceMaterial[]> {
+  await initDb();
+  const pool = getPool();
+  const [rows] = await pool.query(
+    `SELECT id, filename, chunks_indexed, created_at FROM reference_materials
+     WHERE syllabus_id = ? ORDER BY created_at DESC`,
+    [syllabusId],
+  );
+  return rows as ReferenceMaterial[];
 }
 
 export interface RevisionItem {
