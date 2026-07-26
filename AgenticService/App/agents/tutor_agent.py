@@ -22,11 +22,17 @@ def _load_prompt() -> str:
 
 # ── Pydantic contract model ────────────────────────────────────────────────────
 
+class SourceRef(BaseModel):
+    type: Literal["notes", "reference", "syllabus"]
+    label: str  # topic name (notes/syllabus) or filename (reference)
+
+
 class TutorResponse(BaseModel):
     message_id: str
     answer: str
     confidence: Literal["high", "medium", "low"]
-    sources_referenced: list[str]
+    sources: list[SourceRef]
+    sources_referenced: list[str]  # derived from `sources` — kept for existing callers
     follow_up_suggestions: list[str]
     out_of_scope: bool
 
@@ -54,12 +60,20 @@ def generate_tutor_response(
     """
     context_str = ", ".join(syllabus_context) if syllabus_context else "None provided"
 
-    if retrieved_chunks:
-        notes_block = "\n\n".join(
-            f"[{c['topic']}] {c['text']}" for c in retrieved_chunks
-        )
+    notes_chunks = [c for c in retrieved_chunks if c.get("source_type") != "reference"]
+    reference_chunks = [c for c in retrieved_chunks if c.get("source_type") == "reference"]
+
+    if notes_chunks:
+        notes_block = "\n\n".join(f"[{c.get('topic', '')}] {c['text']}" for c in notes_chunks)
     else:
         notes_block = "(no matching notes indexed yet for this topic)"
+
+    if reference_chunks:
+        reference_block = "\n\n".join(
+            f"[{c.get('filename', 'uploaded file')}] {c['text']}" for c in reference_chunks
+        )
+    else:
+        reference_block = "(no reference material uploaded for this syllabus)"
 
     history_block = ""
     if chat_history:
@@ -71,9 +85,14 @@ def generate_tutor_response(
 Scoped topic: {topic_name}
 Other syllabus topics: {context_str}
 
-Retrieved notes context:
+Retrieved notes context (from the student's own generated notes):
 ---
 {notes_block}
+---
+
+Retrieved reference material (from student-uploaded textbook/lecture PDFs):
+---
+{reference_block}
 ---
 
 Recent conversation:
@@ -85,5 +104,8 @@ Return the JSON tutor response object."""
 
     raw = call_llm_json(_load_prompt(), user_prompt, max_tokens=2048, retries=2)
     raw["message_id"] = str(uuid.uuid4())
+    # sources_referenced is derived from the model's structured `sources`
+    # rather than asked for twice — keeps the two fields from disagreeing.
+    raw["sources_referenced"] = [s.get("label", "") for s in raw.get("sources", []) if s.get("label")]
     validated = TutorResponse.model_validate(raw)
     return validated.model_dump()

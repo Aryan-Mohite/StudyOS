@@ -19,7 +19,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from App.agents.tutor_agent import generate_tutor_response
-from App.services.rag_service import retrieve_context
+from App.services.rag_service import retrieve_context, retrieve_reference_context
 
 
 class TutorState(TypedDict):
@@ -28,6 +28,7 @@ class TutorState(TypedDict):
     topic_name: str
     topic_id: str
     notebook_id: Optional[str]
+    syllabus_id: Optional[str]
     syllabus_context: list[str]
     chat_history: list[dict]  # accumulated across turns via the checkpointer
     retrieved_chunks: Optional[list[dict]]
@@ -36,13 +37,35 @@ class TutorState(TypedDict):
 
 
 def _retrieve_node(state: TutorState) -> TutorState:
-    chunks = retrieve_context(
+    """
+    Pulls from two independent sources and merges them: the student's own
+    generated notes (always available once Notes has been run for this
+    topic) and, if this syllabus has any, student-uploaded reference
+    material (textbook chapters, lecture PDFs). Each chunk keeps a
+    source_type tag ("notes" | "reference") so the tutor agent can ground
+    its answer and cite which kind of material it drew on — this mirrors
+    the reference-grounding notes/MCQ/numericals already do, closing the
+    gap where Tutor Chat only ever saw its own generated notes.
+    """
+    notes_chunks = retrieve_context(
         query=state["question"],
         topic_id=state.get("topic_id"),
-        k=4,
+        k=3,
         notebook_id=state.get("notebook_id"),
     )
-    return {**state, "retrieved_chunks": chunks}
+
+    reference_chunks: list[dict] = []
+    if state.get("syllabus_id"):
+        try:
+            reference_chunks = retrieve_reference_context(
+                state["syllabus_id"], query=state["question"], k=3
+            )
+        except Exception:
+            # No reference material uploaded for this syllabus, or the
+            # collection doesn't exist yet — expected default, not an error.
+            reference_chunks = []
+
+    return {**state, "retrieved_chunks": notes_chunks + reference_chunks}
 
 
 def _generate_node(state: TutorState) -> TutorState:
@@ -85,6 +108,7 @@ def run_tutor_turn(
     topic_id: str,
     syllabus_context: list[str],
     notebook_id: Optional[str] = None,
+    syllabus_id: Optional[str] = None,
 ) -> dict:
     """
     Entry point used by main.py. `session_id` should be stable per
@@ -104,6 +128,7 @@ def run_tutor_turn(
             "topic_name": topic_name,
             "topic_id": topic_id,
             "notebook_id": notebook_id,
+            "syllabus_id": syllabus_id,
             "syllabus_context": syllabus_context,
             "retrieved_chunks": None,
             "result": None,

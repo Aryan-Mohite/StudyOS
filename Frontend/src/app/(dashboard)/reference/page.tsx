@@ -124,8 +124,8 @@ export default function ReferenceMaterialPage() {
           <span className="font-medium text-gray-700">
             {syllabus.university ?? "your syllabus"}
           </span>
-          . StudyOS grounds Notes, MCQs, and Numericals in these when they're relevant — this is
-          entirely optional, everything works fine without it.
+          . StudyOS grounds Notes, MCQs, and Numericals in these when they&rsquo;re relevant — this
+          is entirely optional, everything works fine without it.
         </p>
       </div>
 

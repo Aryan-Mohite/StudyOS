@@ -228,6 +228,7 @@ class TutorRequest(BaseModel):
     subject: str
     syllabus_context: list[str] = []
     notebook_id: Optional[str] = None  # scopes RAG retrieval to this notebook's generated notes
+    syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
 
 
 @app.post("/agent/tutor-chat")
@@ -241,6 +242,7 @@ async def agent_tutor_chat(req: TutorRequest):
             topic_id=req.topic_id,
             syllabus_context=req.syllabus_context,
             notebook_id=req.notebook_id,
+            syllabus_id=req.syllabus_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Tutor response failed: {exc}") from exc

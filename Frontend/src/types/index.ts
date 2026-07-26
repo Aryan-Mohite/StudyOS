@@ -231,13 +231,20 @@ export interface ChatMessage {
 
 export type ChatConfidence = "high" | "medium" | "low";
 
+export interface ChatSource {
+  type: "notes" | "reference" | "syllabus";
+  label: string; // topic name (notes/syllabus) or filename (reference)
+}
+
 export interface TutorResponse {
   message_id: string;
   answer: string; // markdown allowed
   confidence: ChatConfidence;
-  sources_referenced: string[]; // topic names from the syllabus
+  sources: ChatSource[];
+  sources_referenced: string[]; // derived labels — kept for existing callers
   follow_up_suggestions: string[];
   out_of_scope: boolean;
+  _cached?: boolean; // true when served from the FAQ cache instead of the LLM
 }
 
 // ─────────────────────────────────────────

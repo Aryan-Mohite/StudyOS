@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Send, MessageSquare, Bot, User } from "lucide-react";
-import type { TutorResponse } from "@/types";
+import { Send, MessageSquare, Bot, User, BookOpen, FileText, ListTree } from "lucide-react";
+import type { ChatSource, TutorResponse } from "@/types";
 import { sendChatMessage, APIError } from "@/lib/api";
 
 const DEFAULT_SUGGESTIONS = [
@@ -22,7 +22,14 @@ interface DisplayMessage {
   role: "user" | "assistant";
   content: string;
   isOutOfScope?: boolean;
+  sources?: ChatSource[];
 }
+
+const SOURCE_ICON: Record<ChatSource["type"], typeof BookOpen> = {
+  notes: BookOpen,
+  reference: FileText,
+  syllabus: ListTree,
+};
 
 export function ChatPanel({ topicId, topicName, subject, syllabusContext = [], syllabusId }: ChatPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -81,7 +88,12 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [], s
       });
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: response.answer, isOutOfScope: response.out_of_scope },
+        {
+          role: "assistant",
+          content: response.answer,
+          isOutOfScope: response.out_of_scope,
+          sources: response.sources,
+        },
       ]);
     } catch (err) {
       const msg =
@@ -159,6 +171,23 @@ export function ChatPanel({ topicId, topicName, subject, syllabusContext = [], s
                     <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-amber-500">Outside your syllabus</span>
                   )}
                   {msg.content}
+                  {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 border-t border-border/60 pt-2">
+                      {msg.sources.map((s, si) => {
+                        const Icon = SOURCE_ICON[s.type] ?? BookOpen;
+                        return (
+                          <span
+                            key={si}
+                            className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700"
+                            title={s.type === "reference" ? "From your uploaded reference material" : s.type === "notes" ? "From your generated notes" : "From your syllabus"}
+                          >
+                            <Icon size={10} />
+                            {s.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

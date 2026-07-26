@@ -16,6 +16,7 @@
  */
 
 import mysql from "mysql2/promise";
+import { randomUUID } from "crypto";
 
 let _pool: mysql.Pool | null = null;
 
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   role          VARCHAR(16) NOT NULL,
   content       LONGTEXT NOT NULL,
   out_of_scope  BOOLEAN NOT NULL DEFAULT FALSE,
+  sources_json  LONGTEXT,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_chat_messages_session (session_id, created_at),
   INDEX idx_chat_messages_user (user_id, created_at)
@@ -192,6 +194,27 @@ CREATE TABLE IF NOT EXISTS weekly_goals (
   target_topics      INT NOT NULL DEFAULT 5,
   completed_topics    INT NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, week_start)
+);
+
+-- ── Tutor Chat FAQ cache ────────────────────────────────────────────────
+-- Keyed on (topic_id, normalized question) so repeated common questions —
+-- "what is polymorphism", "What is Polymorphism?" — hit the same row
+-- without a new LLM call. Deliberately scoped to a *fresh* session only
+-- (see /api/chat/route.ts): serving a cached answer mid-conversation would
+-- ignore the student's actual chat history, so this only fires as a
+-- first-turn shortcut, matching how the AgenticService's LangGraph
+-- checkpointer is also empty at that point (no chat_history divergence).
+
+CREATE TABLE IF NOT EXISTS chat_faq_cache (
+  id                    VARCHAR(64) PRIMARY KEY,
+  topic_id              VARCHAR(128) NOT NULL,
+  question_normalized   VARCHAR(512) NOT NULL,
+  question_original     VARCHAR(1024) NOT NULL,
+  response_json         LONGTEXT NOT NULL,
+  hit_count             INT NOT NULL DEFAULT 1,
+  created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE INDEX idx_faq_topic_question (topic_id, question_normalized)
 );
 
 -- ── Reference material ───────────────────────────────────────────────────
@@ -276,6 +299,18 @@ async function migrateSchema(pool: mysql.Pool): Promise<void> {
     if (defaultRows[0]?.COLUMN_DEFAULT === "dev-user-01") {
       await pool.query(`ALTER TABLE ${table} ALTER COLUMN user_id DROP DEFAULT`);
     }
+  }
+
+  // sources_json added so citation badges survive a page reload (previously
+  // only shown for the live, in-session answer — see CHANGES.md).
+  const [chatColumnRows] = await pool.query<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'chat_messages'`,
+    [dbName],
+  );
+  const existingChatColumns = new Set(chatColumnRows.map((r) => r.COLUMN_NAME as string));
+  if (!existingChatColumns.has("sources_json")) {
+    await pool.query(`ALTER TABLE chat_messages ADD COLUMN sources_json LONGTEXT`);
   }
 }
 
@@ -608,6 +643,69 @@ export async function getReferenceMaterials(syllabusId: string): Promise<Referen
     [syllabusId],
   );
   return rows as ReferenceMaterial[];
+}
+
+// ── Tutor Chat FAQ cache ──────────────────────────────────────────────────
+
+/**
+ * Fuzzy-normalizes a question for cache matching: lowercase, trim, strip
+ * punctuation, collapse whitespace. "What is Polymorphism?" and
+ * "what is polymorphism" both normalize to "what is polymorphism", so
+ * near-identical repeat questions still hit the cache.
+ */
+export function normalizeQuestion(question: string): string {
+  return question
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}\s]/gu, "") // strip punctuation, keep letters/numbers/whitespace
+    .replace(/\s+/g, " ")
+    .slice(0, 512);
+}
+
+/** Returns the cached tutor response for this (topic, normalized question) pair, if any. */
+export async function getCachedFaqAnswer(
+  topicId: string,
+  questionNormalized: string,
+): Promise<Record<string, unknown> | null> {
+  await initDb();
+  const pool = getPool();
+  const [rows] = await pool.query<mysql.RowDataPacket[]>(
+    `SELECT response_json FROM chat_faq_cache WHERE topic_id = ? AND question_normalized = ?`,
+    [topicId, questionNormalized],
+  );
+  if (!rows.length) return null;
+
+  // Best-effort hit-count bump — doesn't need to block the response.
+  pool
+    .query(
+      `UPDATE chat_faq_cache SET hit_count = hit_count + 1 WHERE topic_id = ? AND question_normalized = ?`,
+      [topicId, questionNormalized],
+    )
+    .catch(() => {});
+
+  try {
+    return JSON.parse(rows[0].response_json as string);
+  } catch {
+    return null;
+  }
+}
+
+/** Upserts a fresh LLM answer into the FAQ cache. Best-effort — never let this fail the request. */
+export async function upsertFaqCache(input: {
+  topicId: string;
+  questionNormalized: string;
+  questionOriginal: string;
+  response: unknown;
+}): Promise<void> {
+  await initDb();
+  const pool = getPool();
+  const id = randomUUID();
+  await pool.query(
+    `INSERT INTO chat_faq_cache (id, topic_id, question_normalized, question_original, response_json)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE response_json = VALUES(response_json), hit_count = hit_count + 1`,
+    [id, input.topicId, input.questionNormalized, input.questionOriginal, JSON.stringify(input.response)],
+  );
 }
 
 export interface RevisionItem {

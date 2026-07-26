@@ -124,6 +124,7 @@ def retrieve_context(
             "text": doc.page_content,
             "topic": doc.metadata.get("topic", ""),
             "subject": doc.metadata.get("subject", ""),
+            "source_type": "notes",
         }
         for doc in results
     ]
@@ -204,7 +205,11 @@ def retrieve_reference_context(syllabus_id: str, query: str, k: int = 4) -> list
         return []
 
     return [
-        {"text": doc.page_content, "filename": doc.metadata.get("filename", "")}
+        {
+            "text": doc.page_content,
+            "filename": doc.metadata.get("filename", ""),
+            "source_type": "reference",
+        }
         for doc in results
     ]
 

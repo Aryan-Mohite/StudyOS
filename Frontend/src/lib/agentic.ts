@@ -168,6 +168,7 @@ export interface TutorChatPayload {
   subject: string;
   syllabus_context: string[];
   notebook_id?: string;
+  syllabus_id?: string;
 }
 
 export async function tutorChat(
