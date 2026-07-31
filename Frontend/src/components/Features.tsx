@@ -1,25 +1,15 @@
 "use client";
 import { motion } from "framer-motion";
-import { FileText, Calculator, Youtube, HelpCircle, Calendar, TrendingUp, MessageSquare } from "lucide-react";
+import { FileText, Youtube, HelpCircle, Calendar, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const features = [
   { icon: FileText,   color: "#4650E0", bg: "#EEF0FF", title: "Structured Notes",      desc: "Long notes, short notes, and revision sheets — grounded in your syllabus and textbook." },
-  { icon: Calculator, color: "#7C3AED", bg: "#F5F3FF", title: "Solved Numericals",     desc: "Step-by-step derivations for Maths, Physics, Statistics, and DSA problems." },
   { icon: Youtube,    color: "#DB2777", bg: "#FDF2F8", title: "Video Picks",           desc: "Best-matched NPTEL, YouTube, and MIT OCW videos per topic." },
   { icon: HelpCircle, color: "#D97706", bg: "#FFFBEB", title: "MCQs & Viva Qs",       desc: "Auto-generated practice questions mapped to your topic list and previous year papers." },
   { icon: Calendar,   color: "#059669", bg: "#ECFDF5", title: "Smart Study Plans",     desc: "7-day to 60-day plans tailored to your exam date and current progress." },
   { icon: TrendingUp, color: "#DC2626", bg: "#FEF2F2", title: "Exam Predictions",      desc: "PYQ analysis surfaces High, Medium, Low priority topics before your exam." },
 ] as const;
-
-const prompts = [
-  "Explain AVL rotations",
-  "Numerical on Dijkstra",
-  "MCQs for Unit 3",
-  "7-day revision plan",
-  "High-priority PYQ topics",
-  "DBMS viva questions",
-];
 
 export function Features() {
   return (
@@ -61,22 +51,6 @@ export function Features() {
               </Card>
             </motion.div>
           ))}
-        </div>
-
-        {/* AI Tutor strip */}
-        <div className="mt-6 rounded-xl border border-border bg-page p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <MessageSquare size={14} className="text-brand-500" />
-            <span className="text-xs font-semibold text-gray-500">AI Tutor — ask anything, scoped to your syllabus</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {prompts.map((p) => (
-              <span key={p}
-                className="flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-600">
-                {p}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
     </section>

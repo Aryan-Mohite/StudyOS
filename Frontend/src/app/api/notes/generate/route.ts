@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getPool, initDb, getNotebookIdForSyllabus } from "@/lib/db";
+import { getPool, initDb } from "@/lib/db";
 import { generateNotes as callAgenticNotes, AgenticError } from "@/lib/agentic";
 import { getStudentContext } from "@/lib/profile";
 import type { RowDataPacket } from "mysql2";
@@ -49,9 +49,6 @@ export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
     const student_context = userId ? await getStudentContext(userId) : undefined;
-    const notebook_id = syllabus_id
-      ? (await getNotebookIdForSyllabus(syllabus_id)) ?? undefined
-      : undefined;
 
     const notes = await callAgenticNotes({
       topic_id,
@@ -61,7 +58,6 @@ export async function POST(req: NextRequest) {
       syllabus_context,
       syllabus_id: syllabus_id || undefined,
       student_context,
-      notebook_id,
     });
 
     await pool.query(

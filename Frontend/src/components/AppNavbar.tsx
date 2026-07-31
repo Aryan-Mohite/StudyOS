@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Brain, LayoutDashboard, Calendar, Upload, History, TrendingUp, BookOpen } from "lucide-react";
+import { Brain, LayoutDashboard, Calendar, Upload, TrendingUp, BookOpen } from "lucide-react";
 import { ProfileBadge } from "@/components/ProfileBadge";
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/plan", label: "Study Plan", icon: Calendar },
   { href: "/progress", label: "Progress", icon: TrendingUp },
-  { href: "/history", label: "History", icon: History },
   { href: "/upload", label: "Upload Syllabus", icon: Upload },
   { href: "/reference", label: "Reference Material", icon: BookOpen },
 ];

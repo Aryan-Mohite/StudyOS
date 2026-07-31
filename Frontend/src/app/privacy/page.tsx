@@ -20,12 +20,12 @@ export default function PrivacyPage() {
         <p>
           StudyOS collects only what it needs to generate study materials from your
           syllabus: your account details from Clerk (name, email), the syllabus PDFs
-          and reference material you upload, your study profile (education level,
-          course, university), and your chat history with the AI tutor.
+          and reference material you upload, and your study profile (education level,
+          course, university).
         </p>
         <p>
-          Uploaded documents are used solely to generate notes, MCQs, numericals, and
-          tutor responses for your account. We do not sell your data or share it with
+          Uploaded documents are used solely to generate notes and MCQs
+          for your account. We do not sell your data or share it with
           third parties for advertising.
         </p>
         <p>

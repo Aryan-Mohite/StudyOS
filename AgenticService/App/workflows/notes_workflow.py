@@ -1,13 +1,9 @@
 """
 notes_workflow.py — LangGraph graph: (retrieve student-uploaded reference
-material, if any) → generate notes → index into the RAG vector store (so
-Tutor Chat can retrieve them later) → return.
+material, if any) → generate notes → return.
 
-Indexing failure never fails the request — notes generation succeeding is
-the thing the user is waiting on; RAG indexing is best-effort plumbing.
-Reference-material retrieval is likewise best-effort: no upload for this
-syllabus is the expected default, not an error (see
-App/workflows/README.md).
+Reference-material retrieval is best-effort: no upload for this syllabus is
+the expected default, not an error (see App/workflows/README.md).
 """
 
 from typing import Optional, TypedDict
@@ -15,7 +11,7 @@ from typing import Optional, TypedDict
 from langgraph.graph import END, StateGraph
 
 from App.agents.notes_agent import generate_notes
-from App.services.rag_service import index_note, retrieve_reference_context
+from App.services.rag_service import retrieve_reference_context
 
 
 class NotesState(TypedDict):
@@ -24,7 +20,6 @@ class NotesState(TypedDict):
     unit_title: str
     topic_id: str
     syllabus_id: Optional[str]
-    notebook_id: Optional[str]
     syllabus_context: list[str]
     student_context: Optional[str]
     result: Optional[dict]
@@ -57,33 +52,11 @@ def _generate_node(state: NotesState) -> NotesState:
         return {**state, "result": None, "error": str(exc)}
 
 
-def _index_node(state: NotesState) -> NotesState:
-    if state.get("result"):
-        try:
-            index_note(
-                topic_id=state["topic_id"],
-                subject=state["subject"],
-                topic_name=state["topic_name"],
-                note=state["result"],
-                notebook_id=state.get("notebook_id"),
-            )
-        except Exception:
-            # Best-effort — RAG indexing failure must not fail notes generation.
-            pass
-    return state
-
-
-def _route_after_generate(state: NotesState) -> str:
-    return "index" if state.get("result") else END
-
-
 def build_notes_graph():
     graph = StateGraph(NotesState)
     graph.add_node("generate", _generate_node)
-    graph.add_node("index", _index_node)
     graph.set_entry_point("generate")
-    graph.add_conditional_edges("generate", _route_after_generate, {"index": "index", END: END})
-    graph.add_edge("index", END)
+    graph.add_edge("generate", END)
     return graph.compile()
 
 
@@ -98,7 +71,6 @@ def run_notes_generation(
     syllabus_context: list[str],
     syllabus_id: Optional[str] = None,
     student_context: Optional[str] = None,
-    notebook_id: Optional[str] = None,
 ) -> dict:
     """Entry point used by main.py. Raises ValueError on failure."""
     final_state = _GRAPH.invoke(
@@ -108,7 +80,6 @@ def run_notes_generation(
             "unit_title": unit_title,
             "topic_id": topic_id,
             "syllabus_id": syllabus_id,
-            "notebook_id": notebook_id,
             "syllabus_context": syllabus_context,
             "student_context": student_context,
             "result": None,

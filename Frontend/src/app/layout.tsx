@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "StudyOS — Your OS for studying",
   description:
-    "Turn your university syllabus into a complete AI-powered learning system. Notes, numericals, MCQs, and a personal AI tutor.",
+    "Turn your university syllabus into a complete AI-powered learning system. Notes, MCQs, and a day-by-day study plan.",
   keywords: ["study", "AI", "syllabus", "engineering", "SPPU", "notes"],
   icons: { icon: "/favicon.svg" },
   openGraph: {

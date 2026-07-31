@@ -31,7 +31,6 @@ export interface SyllabusTopic {
   topic_id: string;
   name: string;
   subtopics: string[];
-  has_numericals: boolean;
   difficulty_hint: "easy" | "medium" | "hard" | null;
 }
 
@@ -89,37 +88,6 @@ export interface Note {
 }
 
 // ─────────────────────────────────────────
-// NUMERICALS
-// ─────────────────────────────────────────
-
-export interface NumericalStep {
-  step_number: number;
-  explanation: string;
-  expression: string | null; // LaTeX
-}
-
-export interface NumericalProblem {
-  id: number;
-  question: string;
-  given: Record<string, string>; // e.g. { "Mass (m)": "5 kg" }
-  find: string;
-  steps: NumericalStep[];
-  answer: string;
-  unit: string | null;
-  difficulty: "easy" | "medium" | "hard";
-  concept_tested: string;
-}
-
-export interface NumericalSet {
-  numerical_set_id: string;
-  topic_id: string;
-  topic: string;
-  subject: string;
-  generated_at: string; // ISO 8601
-  problems: NumericalProblem[];
-}
-
-// ─────────────────────────────────────────
 // MCQ
 // ─────────────────────────────────────────
 
@@ -166,7 +134,7 @@ export interface AttemptSubmitInput {
   topic_name: string;
   subject: string;
   syllabus_id?: string;
-  content_type: "mcq" | "numerical";
+  content_type: "mcq";
   difficulty: "easy" | "medium" | "hard";
   is_correct: boolean;
 }
@@ -221,33 +189,6 @@ export interface DashboardAnalytics {
 export type SuggestedDifficulty = "easy" | "medium" | "hard" | "mixed";
 
 // ─────────────────────────────────────────
-// CHAT / AI TUTOR
-// ─────────────────────────────────────────
-
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export type ChatConfidence = "high" | "medium" | "low";
-
-export interface ChatSource {
-  type: "notes" | "reference" | "syllabus";
-  label: string; // topic name (notes/syllabus) or filename (reference)
-}
-
-export interface TutorResponse {
-  message_id: string;
-  answer: string; // markdown allowed
-  confidence: ChatConfidence;
-  sources: ChatSource[];
-  sources_referenced: string[]; // derived labels — kept for existing callers
-  follow_up_suggestions: string[];
-  out_of_scope: boolean;
-  _cached?: boolean; // true when served from the FAQ cache instead of the LLM
-}
-
-// ─────────────────────────────────────────
 // UI STATES
 // ─────────────────────────────────────────
 
@@ -271,16 +212,6 @@ export type NotesState =
   | "empty"
   | "regenerating";
 
-export type NumericalsState =
-  | "idle"
-  | "loading"
-  | "success"
-  | "stale"
-  | "error"
-  | "empty"
-  | "regenerating"
-  | "step_expanded";
-
 export type MCQState =
   | "idle"
   | "loading"
@@ -292,16 +223,6 @@ export type MCQState =
   | "error"
   | "empty"
   | "regenerating";
-
-export type ChatState =
-  | "idle"
-  | "typing"
-  | "loading"
-  | "streaming"
-  | "success"
-  | "out_of_scope"
-  | "error"
-  | "context_lost";
 
 // ─────────────────────────────────────────
 // SHARED / UTILITY
@@ -316,6 +237,4 @@ export interface FeatureState<TData, TState extends string> {
 
 /** Convenience types for each feature's full state shape */
 export type NotesFeatureState = FeatureState<Note, NotesState>;
-export type NumericalsFeatureState = FeatureState<NumericalSet, NumericalsState>;
 export type MCQFeatureState = FeatureState<MCQSet, MCQState>;
-export type ChatFeatureState = FeatureState<TutorResponse[], ChatState>;

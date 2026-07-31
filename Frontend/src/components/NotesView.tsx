@@ -121,7 +121,7 @@ export function NotesView({
     return (
       <EmptyState
         message="This topic has limited content in your syllabus."
-        suggestion="Try a neighbouring topic or ask the AI tutor directly."
+        suggestion="Try a neighbouring topic, or generate the quiz for more practice."
       />
     );
   }

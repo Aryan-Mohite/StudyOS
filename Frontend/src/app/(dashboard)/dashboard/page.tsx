@@ -38,7 +38,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Upload your university syllabus PDF and StudyOS will turn it into
-            notes, MCQs, numericals, and a scoped AI tutor.
+            structured notes, MCQs, and a day-by-day study plan.
           </p>
         </div>
         <Button asChild size="lg">
@@ -53,9 +53,6 @@ export default async function DashboardPage() {
 
   const totalTopics = syllabus.subjects.reduce(
     (a: number, s: SyllabusSubject) => a + s.units.reduce((b: number, u) => b + u.topics.length, 0), 0
-  );
-  const totalWithNumericals = syllabus.subjects.reduce(
-    (a: number, s: SyllabusSubject) => a + s.units.reduce((b: number, u) => b + u.topics.filter((t) => t.has_numericals).length, 0), 0
   );
 
   return (
@@ -84,10 +81,9 @@ export default async function DashboardPage() {
         <DashboardAnalyticsPanel />
 
         {/* Quick stats */}
-        <div className="mb-6 grid grid-cols-3 gap-3">
+        <div className="mb-6 grid grid-cols-2 gap-3">
           {[
             { label: "Total Topics", value: totalTopics, sub: "across all subjects" },
-            { label: "Numericals", value: totalWithNumericals, sub: "topics with solved problems" },
             { label: "Subjects", value: syllabus.subjects.length, sub: syllabus.university },
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-border bg-surface p-4">

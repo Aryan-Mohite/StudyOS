@@ -13,9 +13,6 @@ import type {
   Syllabus,
   Note,
   MCQSet,
-  NumericalSet,
-  TutorResponse,
-  ChatMessage,
   AttemptSubmitInput,
   AttemptRollup,
   TopicMastery,
@@ -136,36 +133,6 @@ export async function checkHealth(): Promise<{ status: string; version: string }
   return request("/api/health");
 }
 
-// ─── Numericals ─────────────────────────────────────────────────────────────────
-
-export interface GenerateNumericalsInput {
-  topic_id: string;
-  topic_name: string;
-  subject: string;
-  count?: number;
-  difficulty?: "easy" | "medium" | "hard" | "mixed";
-  syllabus_context?: string[];
-  syllabus_id?: string;
-  force_regenerate?: boolean;
-}
-
-export async function generateNumericals(
-  input: GenerateNumericalsInput,
-): Promise<NumericalSet & { _cached: boolean }> {
-  return request<NumericalSet & { _cached: boolean }>("/api/numericals/generate", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function getNumericals(topicId: string): Promise<NumericalSet> {
-  return request<NumericalSet>(`/api/numericals/${topicId}`);
-}
-
-export async function deleteNumericals(topicId: string): Promise<void> {
-  await request<void>(`/api/numericals/${topicId}`, { method: "DELETE" });
-}
-
 // ─── Reference material ─────────────────────────────────────────────────────
 
 export async function uploadReferenceMaterial(
@@ -182,26 +149,6 @@ export async function getReferenceMaterials(
   syllabusId: string,
 ): Promise<{ materials: ReferenceMaterial[] }> {
   return request(`/api/reference?syllabus_id=${encodeURIComponent(syllabusId)}`);
-}
-
-// ─── AI Tutor Chat ────────────────────────────────────────────────────────────
-
-export interface SendChatMessageInput {
-  session_id: string;
-  question: string;
-  topic_id: string;
-  topic_name: string;
-  subject: string;
-  syllabus_context?: string[];
-  syllabus_id?: string; // resolved server-side to notebook_id, scopes RAG retrieval to this subject
-  history?: ChatMessage[]; // for callers that also want to keep local UI history
-}
-
-export async function sendChatMessage(input: SendChatMessageInput): Promise<TutorResponse> {
-  return request<TutorResponse>("/api/chat", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
 }
 
 // ─── Personalized Learning ──────────────────────────────────────────────────

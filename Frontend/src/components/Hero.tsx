@@ -35,8 +35,7 @@ export function Hero() {
 
           <motion.p {...fadeUp(0.2)} className="mt-5 max-w-md text-[17px] leading-relaxed text-gray-500">
             Upload any university syllabus and instantly get structured notes,
-            solved problems, video picks, MCQs, and a personal AI tutor —
-            all scoped to your exact curriculum.
+            video picks, and MCQs — all scoped to your exact curriculum.
           </motion.p>
 
           <motion.div {...fadeUp(0.3)} className="mt-8 flex flex-wrap gap-3">

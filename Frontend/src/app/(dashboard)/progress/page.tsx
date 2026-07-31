@@ -45,7 +45,7 @@ export default function ProgressPage() {
     <div className="mx-auto max-w-3xl px-5 py-8">
       <div className="mb-6">
         <h1 className="font-display text-2xl font-bold text-gray-900">Your Progress</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Mastery per topic, based on your quiz and problem attempts</p>
+        <p className="mt-0.5 text-sm text-gray-500">Mastery per topic, based on your quiz attempts</p>
       </div>
 
       {error && <ErrorState message={error} onRetry={() => window.location.reload()} />}
@@ -55,7 +55,7 @@ export default function ProgressPage() {
       {!error && topics && topics.length === 0 && (
         <EmptyState
           message="No attempts yet"
-          suggestion="Take an MCQ quiz or work through some numericals — your progress will show up here."
+          suggestion="Take an MCQ quiz — your progress will show up here."
         />
       )}
 

@@ -3,8 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { recordAttempt } from "@/lib/db";
 
 // ── POST /api/attempts/submit ───────────────────────────────────────────────
-// Records one graded MCQ answer or self-marked numerical, and rolls the
-// result into topic_mastery, revision_schedule, and today's daily_goals.
+// Records one graded MCQ answer, and rolls the result into topic_mastery,
+// revision_schedule, and today's daily_goals.
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
@@ -18,12 +18,12 @@ export async function POST(req: NextRequest) {
     typeof topic_id !== "string" ||
     typeof topic_name !== "string" ||
     typeof subject !== "string" ||
-    (content_type !== "mcq" && content_type !== "numerical") ||
+    content_type !== "mcq" ||
     !["easy", "medium", "hard"].includes(difficulty) ||
     typeof is_correct !== "boolean"
   ) {
     return NextResponse.json(
-      { detail: "topic_id, topic_name, subject, content_type ('mcq'|'numerical'), difficulty ('easy'|'medium'|'hard'), and is_correct (boolean) are required." },
+      { detail: "topic_id, topic_name, subject, content_type ('mcq'), difficulty ('easy'|'medium'|'hard'), and is_correct (boolean) are required." },
       { status: 400 },
     );
   }

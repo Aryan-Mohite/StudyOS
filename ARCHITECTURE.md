@@ -30,16 +30,16 @@ layer (merged), and a Python service stays separate purely for AI work.
 │  • PDF extraction (pdfplumber)            │
 │  • Pydantic contract validation           │
 │  • Syllabus parsing                       │
-│  • Notes generation (+ RAG indexing)      │
+│  • Notes generation                       │
 │  • MCQ generation                         │
-│  • Numericals generation                  │
-│  • AI Tutor chat (RAG + session memory)   │
+│  • Study plan generation                  │
 └──────────────┬──────────────────────────────┘
                │
                ▼
      (vector_db/ — local Chroma store
-      over generated notes, used by
-      Tutor Chat retrieval only)
+      over student-uploaded reference
+      material, used to ground Notes/MCQ
+      generation)
 
 ┌───────────────────────────────────────────┐
 │  MySQL                                     │
@@ -60,15 +60,14 @@ AgenticService/
                      rag_service.py (Chroma vector store)
     workflows/     ← one LangGraph graph per feature — main.py calls these
     prompts/       ← .md prompt contracts (unchanged content, moved here)
-  vector_db/       ← Chroma persistence for Tutor Chat retrieval
+  vector_db/       ← Chroma persistence for reference-material RAG
   main.py, config.py, requirements.txt
 ```
 
-Notes/MCQ/Numericals are single-node graphs (generate → validate); Tutor Chat
-is the one genuinely multi-step graph (retrieve → generate) with LangGraph's
-`MemorySaver` checkpointer carrying conversation history per session. See
-`AgenticService/MIGRATION_NOTES.md` for the full rationale and what's ported
-vs. newly built.
+Notes/MCQ/Study Plan/Syllabus parsing are single- or two-node graphs
+(retrieve/generate → validate → repair, where applicable). See
+`AgenticService/App/workflows/README.md` for the full breakdown of each
+workflow.
 
 ## Frontend internals
 
@@ -88,7 +87,7 @@ Frontend/src/
     AppNavbar.tsx           ← authenticated app navbar ((dashboard) layout)
     Footer.tsx, Hero.tsx, Features.tsx, CTA.tsx, Mockup.tsx  ← landing page
     SyllabusTree.tsx        ← left-nav syllabus tree (dashboard + study page)
-    NotesView.tsx, NumericalsView.tsx, MCQQuiz.tsx, ChatPanel.tsx  ← topic tabs
+    NotesView.tsx, MCQQuiz.tsx  ← topic tabs
     LoadingSteps.tsx, StateComponents.tsx  ← shared idle/loading/error/empty UI
   lib/                    ← api.ts (API client), db.ts, agentic.ts, utils.ts
   types/                  ← shared TypeScript contracts
@@ -99,7 +98,7 @@ signed-out marketing navbar shown on `/`, `AppNavbar.tsx` is the signed-in
 app navbar (with `<UserButton/>`) shown inside `(dashboard)/layout.tsx`.
 
 There is no `mocks/` folder and no `USE_REAL_API` flag — every feature
-(Notes, MCQ, Numericals, Tutor Chat) always calls the real API routes.
+(Notes, MCQ) always calls the real API routes.
 Study Plan has no backend yet, so `/plan` shows an honest "coming soon"
 state rather than fake generated data.
 
@@ -184,7 +183,7 @@ There is no separate gateway step anymore — Next.js *is* the gateway.
 | `PORT` | Default 8000 (Railway/Render set this automatically in prod) |
 | `MODEL_NAME` | Default `claude-sonnet-4-6` |
 | `ALLOWED_ORIGINS` | Comma-separated list of origins allowed to call this service (your Next.js URL) |
-| `VECTOR_DB_DIR` | Default `vector_db` — local Chroma persistence path for Tutor Chat RAG |
+| `VECTOR_DB_DIR` | Default `vector_db` — local Chroma persistence path for reference-material RAG |
 | `EMBEDDING_MODEL` | Default `sentence-transformers/all-MiniLM-L6-v2` — local embeddings, no extra API key needed |
 
 ### Frontend (.env.local)
@@ -208,13 +207,6 @@ POST   /api/mcq/generate        ← generate or return cached MCQ set
 GET    /api/mcq/:topicId        ← fetch cached MCQ set
 DELETE /api/mcq/:topicId        ← delete cached MCQ set
 
-POST   /api/numericals/generate ← generate or return cached numericals set
-GET    /api/numericals/:topicId ← fetch cached numericals set
-DELETE /api/numericals/:topicId ← delete cached numericals set
-
-POST   /api/chat                ← forward one tutor-chat turn (no caching —
-                                    memory lives in the AgenticService)
-
 GET    /api/health              ← API health check
 ```
 
@@ -226,10 +218,9 @@ its base URL (now same-origin by default).
 
 ```
 POST  /agent/parse-syllabus     ← PDF bytes → structured syllabus JSON
-POST  /agent/generate-notes     ← topic params → Notes contract JSON (+ RAG indexing)
+POST  /agent/generate-notes     ← topic params → Notes contract JSON
 POST  /agent/generate-mcq       ← topic params → MCQ contract JSON
-POST  /agent/generate-numericals ← topic params → Numericals contract JSON
-POST  /agent/tutor-chat         ← session_id + question → Tutor response JSON
+POST  /agent/generate-study-plan ← syllabus + exam date → Study Plan contract JSON
 
 GET   /health                   ← agentic layer health check
 ```
@@ -242,7 +233,7 @@ Each endpoint delegates to a LangGraph workflow in `App/workflows/`.
 2. Add agent → `AgenticService/App/agents/study_plan_agent.py` (Pydantic models + Claude call via `llm_service`)
 3. Add workflow → `AgenticService/App/workflows/study_plan_workflow.py` (LangGraph graph wrapping the agent)
 4. Add endpoint → `AgenticService/main.py` (`POST /agent/generate-study-plan`)
-5. Add route → `Frontend/src/app/api/plan/generate/route.ts` (cache-first, mirrors `numericals/generate/route.ts`)
+5. Add route → `Frontend/src/app/api/plan/generate/route.ts` (cache-first, mirrors `mcq/generate/route.ts`)
 6. Add MySQL table → `Frontend/src/lib/db.ts`
 7. Wire frontend → replace mock in the Study Plan view with an `api.ts` call, flip its flag in `flags.ts`
 

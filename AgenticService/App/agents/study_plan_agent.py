@@ -56,8 +56,7 @@ class StudyPlanResponse(BaseModel):
 
 def flatten_syllabus_topics(syllabus: dict) -> list[dict]:
     """Flattens the parsed syllabus contract into a flat topic list for the
-    study-plan prompt: [{topic_id, topic_name, subject, has_numericals,
-    difficulty_hint}, ...]."""
+    study-plan prompt: [{topic_id, topic_name, subject, difficulty_hint}, ...]."""
     flat: list[dict] = []
     for subject in syllabus.get("subjects", []):
         subject_name = subject.get("name", "Unknown Subject")
@@ -67,7 +66,6 @@ def flatten_syllabus_topics(syllabus: dict) -> list[dict]:
                     "topic_id": topic.get("topic_id") or str(uuid.uuid4()),
                     "topic_name": topic.get("name", "Untitled topic"),
                     "subject": subject_name,
-                    "has_numericals": bool(topic.get("has_numericals", False)),
                     "difficulty_hint": topic.get("difficulty_hint") or "medium",
                 })
     return flat

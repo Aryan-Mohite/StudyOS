@@ -1,13 +1,12 @@
 """
 main.py — StudyOS AgenticService
-Pure AI layer: PDF parsing, notes/MCQ/numericals generation, tutor chat.
+Pure AI layer: PDF parsing, notes/MCQ generation, study plans.
 No database. No caching. That's the Express layer's job.
 
-Notes, Tutor Chat, MCQ, Numericals, Study Plan, and Syllabus parsing all
-delegate to a LangGraph workflow in App/workflows/ (genuine multi-step:
-generate+index, retrieve+generate, generate+validate+repair). See
-App/workflows/README.md for the full breakdown and ARCHITECTURE.md for the
-full request flow.
+Notes, MCQ, Study Plan, and Syllabus parsing all delegate to a LangGraph
+workflow in App/workflows/ (genuine multi-step: generate+index,
+generate+validate+repair). See App/workflows/README.md for the full
+breakdown and ARCHITECTURE.md for the full request flow.
 """
 
 import os
@@ -23,11 +22,9 @@ from config import settings
 from App.services.pdf_service import extract_pdf_text
 from App.workflows.mcq_workflow import run_mcq_generation
 from App.workflows.notes_workflow import run_notes_generation
-from App.workflows.numericals_workflow import run_numericals_generation
 from App.workflows.reference_material_workflow import run_reference_ingestion
 from App.workflows.study_plan_workflow import run_study_plan_generation
 from App.workflows.syllabus_workflow import run_pdf_analysis
-from App.workflows.tutor_workflow import run_tutor_turn
 
 app = FastAPI(
     title="StudyOS AgenticService",
@@ -109,8 +106,8 @@ async def agent_ingest_reference_material(
     PDF, past-paper solutions) for a syllabus. Optional feature — call this
     zero or more times per syllabus_id; each call adds to the same
     reference-material collection for that syllabus (see
-    App/services/rag_service.py). Not required for Notes/MCQ/Numericals to
-    work — those fall back to trained knowledge alone if nothing's indexed.
+    App/services/rag_service.py). Not required for Notes/MCQ to work — those
+    fall back to trained knowledge alone if nothing's indexed.
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
@@ -137,12 +134,11 @@ class NotesRequest(BaseModel):
     syllabus_context: list[str] = []
     syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
     student_context: Optional[str] = None  # one-line profile summary, e.g. "B.Tech 2nd Year, CS, SPPU"
-    notebook_id: Optional[str] = None  # scopes generated-notes RAG indexing to this notebook
 
 
 @app.post("/agent/generate-notes")
 async def agent_generate_notes(req: NotesRequest):
-    """Generates notes, then indexes them into the RAG vector store for Tutor Chat."""
+    """Generates notes, grounded in any student-uploaded reference material for this syllabus."""
     try:
         return run_notes_generation(
             topic_name=req.topic_name,
@@ -152,7 +148,6 @@ async def agent_generate_notes(req: NotesRequest):
             syllabus_context=req.syllabus_context,
             syllabus_id=req.syllabus_id,
             student_context=req.student_context,
-            notebook_id=req.notebook_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Notes generation failed: {exc}") from exc
@@ -186,66 +181,6 @@ async def agent_generate_mcq(req: MCQRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"MCQ generation failed: {exc}") from exc
-
-
-# ── Numericals generation ─────────────────────────────────────────────────────
-
-class NumericalsRequest(BaseModel):
-    topic_id: str
-    topic_name: str
-    subject: str
-    count: int = 5
-    difficulty: str = "mixed"
-    syllabus_context: list[str] = []
-    syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
-    student_context: Optional[str] = None  # one-line profile summary, e.g. "B.Tech 2nd Year, CS, SPPU"
-
-
-@app.post("/agent/generate-numericals")
-async def agent_generate_numericals(req: NumericalsRequest):
-    try:
-        return run_numericals_generation(
-            topic_name=req.topic_name,
-            subject=req.subject,
-            topic_id=req.topic_id,
-            count=req.count,
-            difficulty=req.difficulty,
-            syllabus_context=req.syllabus_context,
-            syllabus_id=req.syllabus_id,
-            student_context=req.student_context,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=f"Numericals generation failed: {exc}") from exc
-
-
-# ── Tutor chat ────────────────────────────────────────────────────────────────
-
-class TutorRequest(BaseModel):
-    session_id: str  # e.g. f"{user_id}:{topic_id}" — stable per conversation
-    question: str
-    topic_id: str
-    topic_name: str
-    subject: str
-    syllabus_context: list[str] = []
-    notebook_id: Optional[str] = None  # scopes RAG retrieval to this notebook's generated notes
-    syllabus_id: Optional[str] = None  # enables grounding in uploaded reference material
-
-
-@app.post("/agent/tutor-chat")
-async def agent_tutor_chat(req: TutorRequest):
-    try:
-        return run_tutor_turn(
-            session_id=req.session_id,
-            question=req.question,
-            subject=req.subject,
-            topic_name=req.topic_name,
-            topic_id=req.topic_id,
-            syllabus_context=req.syllabus_context,
-            notebook_id=req.notebook_id,
-            syllabus_id=req.syllabus_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=f"Tutor response failed: {exc}") from exc
 
 
 # ── Study plan generation ─────────────────────────────────────────────────────

@@ -1,3 +1,107 @@
+# Remove AI Tutor Chat + Solved Numericals — Changes
+
+Delivered as changed files only, paths mirror the repo root. Extract over
+your working copy of `StudyOS/`. Files with no remaining purpose were
+deleted rather than left as dead code.
+
+Built against a fresh clone/read of the repo per usual. Verified with
+`python3 -m py_compile` (all changed AgenticService files, clean) and
+`tsc --noEmit` (clean, zero errors).
+
+---
+
+## Summary
+
+Removed two features end-to-end, per explicit request: **AI Tutor Chat**
+and **Solved Numericals**. This includes their frontend UI, Next.js API
+routes, AgenticService agents/workflows/prompts, and MySQL tables —
+everything specific to these two features, including infrastructure that
+existed *only* to support them.
+
+## AI Tutor Chat — removed
+
+- **Frontend:** `components/ChatPanel.tsx`, `api/chat/route.ts`,
+  `api/chat/sessions/route.ts`, `(dashboard)/history/page.tsx` deleted.
+  Tutor panel and mobile "AI Tutor" overlay removed from
+  `(dashboard)/study/[topicId]/page.tsx`; "History" link removed from
+  `AppNavbar.tsx`.
+- **AgenticService:** `App/agents/tutor_agent.py`,
+  `App/workflows/tutor_workflow.py`, `App/prompts/tutor_chat.md` deleted;
+  `POST /agent/tutor-chat` endpoint removed from `main.py`.
+- **DB:** `chat_messages` and `chat_faq_cache` tables dropped (via
+  migration `DROP TABLE IF EXISTS` in `lib/db.ts`, so existing installs
+  clean up automatically on next start, not just fresh ones).
+
+## Solved Numericals — removed
+
+- **Frontend:** `components/NumericalsView.tsx`,
+  `api/numericals/generate/route.ts`, `api/numericals/[topicId]/route.ts`
+  deleted. "Problems" tab removed from the study page. `attempts.submit`
+  and its type now only accept `content_type: "mcq"` (the `"numerical"`
+  variant is gone).
+- **AgenticService:** `App/agents/numericals_agent.py`,
+  `App/workflows/numericals_workflow.py`,
+  `App/prompts/numericals_generator.md` deleted; `POST
+  /agent/generate-numericals` endpoint removed from `main.py`.
+- **DB:** `numerical_sets` table dropped (same migration cleanup as above).
+  The `attempts` table itself is untouched — it's shared with MCQ and its
+  historical rows aren't feature-specific.
+
+## Judgment calls (flagging explicitly, not silently)
+
+1. **Dropped `notebooks` table and `syllabi.notebook_id` column.** These
+   existed *solely* to scope the Tutor's own RAG retrieval
+   (`studyos_notes_{notebook_id}` Chroma collections) — reference-material
+   RAG (used by Notes/MCQ grounding) is scoped by `syllabus_id` directly and
+   never touched notebooks. With Tutor gone, this linkage had no remaining
+   consumer, so it's removed rather than left as dead infrastructure,
+   consistent with the project's lean-infra stance. `lib/db.ts` migrates
+   existing installs by dropping the column/index on next `initDb()` call.
+2. **Removed `has_numericals` from the syllabus contract.** This field
+   existed only to flag numerically-heavy topics for two consumers: the
+   removed Numericals feature, and the study-plan agent's "don't cluster
+   numerically-heavy topics" scheduling rule (also removed). Dropped from
+   `syllabus_parser.md`'s output contract, `SyllabusTopic` (frontend type),
+   `study_plan_agent.py`'s topic flattening, and the dashboard's topic-count
+   stat that read it.
+3. **Simplified `rag_service.py` and `notes_workflow.py`.** The
+   `studyos_notes` collection and `index_note()`/`retrieve_context()`
+   functions existed only to feed Tutor Chat's retrieval step — nothing else
+   ever read from that collection. Removed along with the notes-generation
+   workflow's now-pointless "index into RAG" node (Notes generation itself
+   is unaffected; only the post-generation indexing step, whose sole
+   consumer was Tutor, is gone). Reference-material RAG
+   (`index_reference_material` / `retrieve_reference_context`, used by
+   Notes/MCQ grounding) is untouched.
+4. **Deleted two stale docs referencing only-now-deleted files.** Root
+   `README.md` (a historical "Profile + Auto-Notebooks + RAG patch" note)
+   and `AgenticService/MIGRATION_NOTES.md` (a one-time migration record)
+   exclusively documented `tutor_agent.py`, `tutor_workflow.py`,
+   `ChatPanel.tsx`, and the `notebooks` table/`notebook_id` linkage — all
+   now gone. Left in place, they'd actively mislead anyone reading them.
+   `API.md`, `ARCHITECTURE.md`, and `App/workflows/README.md` are the
+   maintained docs and have been updated in place instead.
+5. **Copy-only edits, no behavior change:** landing page (`Hero.tsx`,
+   `Features.tsx`), `terms/page.tsx`, `privacy/page.tsx` (also drops the
+   now-inaccurate "chat history" data-collection claim), `layout.tsx`
+   metadata, `dashboard/page.tsx`, `progress/page.tsx`,
+   `profile/page.tsx`, `reference/page.tsx`, and `NotesView.tsx`'s
+   empty-state suggestion all had numericals/tutor mentions removed or
+   reworded.
+
+## Not touched
+
+- Reference-material upload/RAG (`api/reference/*`,
+  `index_reference_material`, `retrieve_reference_context`,
+  `has_reference_material` in `rag_service.py`) — still used by Notes and
+  MCQ generation for grounding.
+- The `attempts`, `topic_mastery`, `revision_schedule`, `daily_goals`,
+  `weekly_goals` tables and their routes — shared personalized-learning
+  infrastructure, still fully used by MCQ attempts.
+- Study Plan feature — unrelated to this request.
+
+---
+
 # Week 5 — RAG + Knowledge Base — Changes
 
 Delivered as changed files only, paths mirror the repo root. Extract over

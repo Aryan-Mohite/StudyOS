@@ -26,10 +26,9 @@ routes) before the handler runs.
 
 **`POST /api/upload`**
 Uploads a syllabus PDF, parses it via the AgenticService, and caches the
-result. Auto-creates a `notebooks` row for this subject (no separate
-"create notebook" step exists).
+result.
 - Body: `multipart/form-data`, field `file` (PDF, ≤10 MB)
-- 200 → parsed syllabus contract (see [`syllabus_agent.py`](AgenticService/App/agents/syllabus_agent.py)) + `notebook_id`
+- 200 → parsed syllabus contract (see [`syllabus_agent.py`](AgenticService/App/agents/syllabus_agent.py))
 - 400 → missing/non-PDF/oversized file · 502 → parsing failed
 
 **`GET /api/upload/latest`**
@@ -54,13 +53,11 @@ Returns the current user's most recently uploaded syllabus.
 
 **`GET /api/mcq/:topicId`** / **`DELETE /api/mcq/:topicId`** — same shape as Notes.
 
-### Solved Numericals
-
-**`POST /api/numericals/generate`**
-- Body: `{ topic_id, topic_name, subject, count?: number (1–10, default 5), difficulty?: "easy"|"medium"|"hard"|"mixed" (default "mixed"), syllabus_context?, syllabus_id?, force_regenerate? }`
-- 400 if `difficulty` isn't one of the four allowed values.
-
-**`GET /api/numericals/:topicId`** / **`DELETE /api/numericals/:topicId`** — same shape as Notes.
+**`GET /api/mcq/suggested-difficulty?topic_id=...`**
+A difficulty suggestion only — the student still picks the difficulty
+themselves. Derived from their own accuracy on this topic, not returned
+until there are at least 3 prior attempts (`"mixed"` otherwise).
+- 200 → `{ topic_id, suggested_difficulty: "easy"|"medium"|"hard"|"mixed" }`
 
 ### Study Plan
 
@@ -71,32 +68,12 @@ Builds a day-by-day schedule from a syllabus and an exam date.
 - 200 → `{ study_plan_id, syllabus_id, exam_date, total_days, days: [{ day_number, session_type: "learn"|"revision"|"mock_test"|"rest", topics: [{topic_id, topic_name, subject}], focus_note }], _cached }`
 - 400 → missing/malformed input · 404 → syllabus not found · 502 → generation failed
 
-### AI Tutor Chat
-
-**`POST /api/chat`**
-Single tutor turn, scoped to one topic. Conversation memory for the live
-LangGraph turn is in-process (`session_id = "{user_id}:{topic_id}"`); every
-turn is also durably persisted to MySQL for history (see below).
-- Body: `{ question, topic_id, topic_name, subject, syllabus_context?: string[], syllabus_id? }`
-- 200 → `{ message_id, answer, confidence, sources_referenced, follow_up_suggestions, out_of_scope }`
-- 400 → missing required fields · 502 → tutor response failed
-
-**`GET /api/chat?topic_id=...`**
-Returns the persisted message history for the current user's conversation
-on this topic, oldest first — used to resume a chat.
-- 200 → `{ session_id, messages: [{ role: "user"|"assistant", content, isOutOfScope }] }`
-
-**`GET /api/chat/sessions`**
-Lists every topic the current user has chatted about, newest-first, with a
-preview of the last message — powers the browsable chat-history page.
-- 200 → `{ sessions: [{ topic_id, topic_name, subject, message_count, last_message_at, last_message_preview }] }`
-
 ### Reference Material
 
 **`POST /api/reference`**
 Uploads one textbook/lecture PDF, indexes it into that syllabus's Chroma
 collection via the AgenticService, and records the filename in MySQL.
-Optional — Notes/MCQ/Numericals generation works fine with nothing
+Optional — Notes/MCQ generation works fine with nothing
 uploaded; it just answers from trained knowledge instead of grounding in
 your material (`grounded_in_reference: false` on those responses).
 - Body: `multipart/form-data`, fields `file` (PDF, ≤10 MB) and `syllabus_id`
@@ -106,6 +83,24 @@ your material (`grounded_in_reference: false` on those responses).
 **`GET /api/reference?syllabus_id=...`**
 Lists files already uploaded for a syllabus, newest first.
 - 200 → `{ materials: [{ id, filename, chunks_indexed, created_at }] }`
+
+### Personalized Learning
+
+**`POST /api/attempts/submit`**
+Records one graded MCQ answer, and rolls the result into `topic_mastery`,
+`revision_schedule`, and today's `daily_goals`.
+- Body: `{ topic_id, topic_name, subject, syllabus_id?, content_type: "mcq", difficulty: "easy"|"medium"|"hard", is_correct: boolean }`
+- 200 → `{ mastery_score, total_attempts, correct_attempts, next_review_date }`
+
+**`GET /api/progress`** → `{ topics: TopicMastery[], overall_accuracy: number|null, total_attempts: number }`
+
+**`GET /api/goals/daily`** / **`POST /api/goals/daily`** — get or set today's daily question-count goal.
+
+**`GET /api/goals/weekly`** / **`POST /api/goals/weekly`** — get or set this week's topic-count goal.
+
+**`GET /api/revision`** → `{ items: RevisionItem[] }` — topics due for revision in the next 7 days (including overdue).
+
+**`GET /api/analytics/dashboard`** → aggregated dashboard payload: streak, daily/weekly goals, weak topics, upcoming revisions, overall accuracy.
 
 ### Profile
 
@@ -129,14 +124,17 @@ to the browser; CORS is locked to `ALLOWED_ORIGINS`.
 
 **`POST /agent/ingest-reference-material`** — `multipart/form-data`: `syllabus_id`, `file` (PDF). Optional, callable zero or more times per syllabus; indexes a student-supplied reference PDF (textbook chapter, past-paper solutions) into that syllabus's RAG collection. Generation endpoints work without this — they fall back to trained knowledge alone.
 
-**`POST /agent/generate-notes`** — JSON body matches `NotesRequest`: `topic_id, topic_name, subject, unit_title, syllabus_context, syllabus_id?, student_context?, notebook_id?`. Generates notes, then indexes them into the RAG store for Tutor Chat to retrieve later.
+**`POST /agent/generate-notes`** — JSON body matches `NotesRequest`: `topic_id, topic_name, subject, unit_title, syllabus_context, syllabus_id?, student_context?`. Grounds generation in any uploaded reference material for `syllabus_id`, if present.
 
 **`POST /agent/generate-mcq`** — `MCQRequest`: `topic_id, topic_name, subject, count (default 10), difficulty (default "mixed"), syllabus_context, syllabus_id?, student_context?`. LangGraph generate → validate → repair (checks duplicate `concept_tested`, difficulty distribution, lazy explanations).
 
-**`POST /agent/generate-numericals`** — `NumericalsRequest`, same shape as MCQ with `count` default 5. Validates for empty `given` fields and placeholder answers.
-
 **`POST /agent/generate-study-plan`** — `StudyPlanRequest`: `syllabus_id, syllabus (full parsed contract), exam_date ("YYYY-MM-DD")`. LangGraph generate → validate → repair (checks every topic scheduled exactly once, contiguous day numbering, a revision day present for plans of 4+ days).
 
-**`POST /agent/tutor-chat`** — `TutorRequest`: `session_id, question, topic_id, topic_name, subject, syllabus_context, notebook_id?`. RAG-retrieves from the topic's notes, then answers with `MemorySaver` conversation-turn checkpointing keyed by `session_id`. This checkpoint is in-process only — it does not survive a restart, which is why the Next.js layer separately persists every turn to MySQL (`chat_messages`) for durable history.
+All `/agent/*` endpoints return `502` with `{ detail: "<context>: <e>" }` on an LLM/generation failure, and share the underlying Pydantic contract models defined next to each workflow in `AgenticService/App/agents/`.
 
-All `/agent/*` endpoints return `502` with `{ detail: "<context>: <error>" }` on an LLM/generation failure, and share the underlying Pydantic contract models defined next to each workflow in `AgenticService/App/agents/`.
+---
+
+**Removed features:** The AI Tutor Chat (`/api/chat`, `/api/chat/sessions`,
+`/agent/tutor-chat`) and Solved Numericals (`/api/numericals/*`,
+`/agent/generate-numericals`) endpoints have been removed from the product.
+See `CHANGES.md` for details.

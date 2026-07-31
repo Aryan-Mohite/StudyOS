@@ -28,7 +28,6 @@ Return ONLY the JSON object below. No prose before or after. No markdown fences.
 - Distribute topics roughly evenly across the available "learn" days based on difficulty — do not cram most topics into the first few days and leave later days empty.
 - Reserve the final 10–15% of days (minimum 1 day, minimum 2 days if more than 10 days are available) as `"session_type": "revision"` with an empty or near-empty `topics` array — these days revisit earlier material rather than introducing new topics.
 - If more than 20 days are available, insert exactly one `"session_type": "mock_test"` day roughly two-thirds of the way through, with an empty `topics` array.
-- Topics marked as numerically heavy (has_numericals true) should not all be scheduled on the same day or clustered at the very end — spread them out.
 - Harder topics (difficulty_hint "hard") should generally come earlier, so there is time to revisit them, not on the last learning day before revision.
 - Do not invent topics that were not in the input list.
 - Do not schedule more than 4 topics on a single "learn" day unless the total topic count forces it.

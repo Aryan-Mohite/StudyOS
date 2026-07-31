@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
  * Forwards one uploaded textbook/lecture PDF to the AgenticService for
  * extraction + indexing into that syllabus's reference-material Chroma
  * collection, then records the filename in MySQL so it can be listed back.
- * Optional feature — Notes/MCQ/Numericals generation already falls back to
+ * Optional feature — Notes/MCQ generation already falls back to
  * trained knowledge alone when nothing's been uploaded (see
  * `grounded_in_reference` on generation responses).
  */

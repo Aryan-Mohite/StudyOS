@@ -28,7 +28,6 @@ Return ONLY the JSON object below. No prose before or after. No markdown fences.
               "topic_id": "",
               "name": "string — concise topic name (not a full sentence)",
               "subtopics": ["string", "..."],
-              "has_numericals": boolean,
               "difficulty_hint": "easy | medium | hard | null"
             }
           ]
@@ -57,7 +56,6 @@ Return ONLY the JSON object below. No prose before or after. No markdown fences.
 - Each bullet point, numbered item, or line within a unit is a topic
 - Group closely related sub-items as `subtopics` under one topic
 - Topic `name` should be concise: "Fourier's Law of Heat Conduction", not "1.1 Introduction to Fourier's Law and its applications in steady-state problems"
-- `has_numericals`: set true if the topic involves calculations, problems, or numerical methods
 - `difficulty_hint`: use your knowledge of the subject — null if unsure
 
 **What to ignore:**

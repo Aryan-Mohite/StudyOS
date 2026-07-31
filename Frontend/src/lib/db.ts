@@ -16,7 +16,6 @@
  */
 
 import mysql from "mysql2/promise";
-import { randomUUID } from "crypto";
 
 let _pool: mysql.Pool | null = null;
 
@@ -50,24 +49,14 @@ CREATE TABLE IF NOT EXISTS user_profile (
   updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS notebooks (
-  id           VARCHAR(64) PRIMARY KEY,
-  user_id      VARCHAR(128) NOT NULL,
-  subject_name VARCHAR(255),
-  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_notebooks_user (user_id)
-);
-
 CREATE TABLE IF NOT EXISTS syllabi (
   id           VARCHAR(64) PRIMARY KEY,
   user_id      VARCHAR(128) NOT NULL,
-  notebook_id  VARCHAR(64),
   filename     VARCHAR(512),
   raw_text     LONGTEXT,
   parsed_json  LONGTEXT NOT NULL,
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_syllabi_user (user_id),
-  INDEX idx_syllabi_notebook (notebook_id)
+  INDEX idx_syllabi_user (user_id)
 );
 
 CREATE TABLE IF NOT EXISTS notes (
@@ -93,18 +82,6 @@ CREATE TABLE IF NOT EXISTS mcq_sets (
   INDEX idx_mcq_sets_topic_id (topic_id)
 );
 
-CREATE TABLE IF NOT EXISTS numerical_sets (
-  id           VARCHAR(64) PRIMARY KEY,
-  syllabus_id  VARCHAR(64),
-  topic_id     VARCHAR(128) NOT NULL,
-  topic_name   VARCHAR(512) NOT NULL,
-  subject      VARCHAR(256) NOT NULL,
-  difficulty   VARCHAR(32) NOT NULL DEFAULT 'mixed',
-  content_json LONGTEXT NOT NULL,
-  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_numerical_sets_topic_id (topic_id)
-);
-
 CREATE TABLE IF NOT EXISTS study_plans (
   id           VARCHAR(64) PRIMARY KEY,
   user_id      VARCHAR(128) NOT NULL,
@@ -116,28 +93,11 @@ CREATE TABLE IF NOT EXISTS study_plans (
   INDEX idx_study_plans_syllabus (syllabus_id)
 );
 
-CREATE TABLE IF NOT EXISTS chat_messages (
-  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
-  session_id    VARCHAR(256) NOT NULL,
-  user_id       VARCHAR(128) NOT NULL,
-  topic_id      VARCHAR(128) NOT NULL,
-  topic_name    VARCHAR(512) NOT NULL,
-  subject       VARCHAR(256) NOT NULL,
-  role          VARCHAR(16) NOT NULL,
-  content       LONGTEXT NOT NULL,
-  out_of_scope  BOOLEAN NOT NULL DEFAULT FALSE,
-  sources_json  LONGTEXT,
-  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_chat_messages_session (session_id, created_at),
-  INDEX idx_chat_messages_user (user_id, created_at)
-);
-
 -- ── Personalized Learning ──────────────────────────────────────────────────
--- Every graded interaction (an answered MCQ, or a self-marked numerical)
--- lands here first. topic_mastery and revision_schedule are rollups kept in
--- sync on write, so reads (dashboard, progress page) never have to scan
--- raw attempts. This mirrors the cache-first pattern used everywhere else:
--- write once, read the rollup.
+-- Every graded MCQ attempt lands here first. topic_mastery and
+-- revision_schedule are rollups kept in sync on write, so reads (dashboard,
+-- progress page) never have to scan raw attempts. This mirrors the
+-- cache-first pattern used everywhere else: write once, read the rollup.
 
 CREATE TABLE IF NOT EXISTS attempts (
   id            BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -146,7 +106,7 @@ CREATE TABLE IF NOT EXISTS attempts (
   topic_id      VARCHAR(128) NOT NULL,
   topic_name    VARCHAR(512) NOT NULL,
   subject       VARCHAR(256) NOT NULL,
-  content_type  VARCHAR(16) NOT NULL,      -- 'mcq' | 'numerical'
+  content_type  VARCHAR(16) NOT NULL,      -- 'mcq'
   difficulty    VARCHAR(32) NOT NULL,       -- 'easy' | 'medium' | 'hard'
   is_correct    BOOLEAN NOT NULL,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -196,27 +156,6 @@ CREATE TABLE IF NOT EXISTS weekly_goals (
   PRIMARY KEY (user_id, week_start)
 );
 
--- ── Tutor Chat FAQ cache ────────────────────────────────────────────────
--- Keyed on (topic_id, normalized question) so repeated common questions —
--- "what is polymorphism", "What is Polymorphism?" — hit the same row
--- without a new LLM call. Deliberately scoped to a *fresh* session only
--- (see /api/chat/route.ts): serving a cached answer mid-conversation would
--- ignore the student's actual chat history, so this only fires as a
--- first-turn shortcut, matching how the AgenticService's LangGraph
--- checkpointer is also empty at that point (no chat_history divergence).
-
-CREATE TABLE IF NOT EXISTS chat_faq_cache (
-  id                    VARCHAR(64) PRIMARY KEY,
-  topic_id              VARCHAR(128) NOT NULL,
-  question_normalized   VARCHAR(512) NOT NULL,
-  question_original     VARCHAR(1024) NOT NULL,
-  response_json         LONGTEXT NOT NULL,
-  hit_count             INT NOT NULL DEFAULT 1,
-  created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE INDEX idx_faq_topic_question (topic_id, question_normalized)
-);
-
 -- ── Reference material ───────────────────────────────────────────────────
 -- The AgenticService indexes the actual PDF text into a per-syllabus Chroma
 -- collection (see App/services/rag_service.py) — this table is just the
@@ -256,10 +195,8 @@ export async function initDb(): Promise<void> {
 
 /**
  * `CREATE TABLE IF NOT EXISTS` only helps on a fresh database — it does
- * nothing for a `syllabi` table that already existed before the notebooks
- * feature was added (which is exactly what caused "Unknown column
- * 'notebook_id' in 'field list'"). This adds any columns/indexes that are
- * missing on tables that already existed, so upgrading an existing DB
+ * nothing to a table that already existed under an older schema. This
+ * brings an existing DB in line with the current schema so upgrading
  * doesn't require running SQL by hand.
  */
 async function migrateSchema(pool: mysql.Pool): Promise<void> {
@@ -267,22 +204,28 @@ async function migrateSchema(pool: mysql.Pool): Promise<void> {
   const dbName = dbRows[0]?.db;
   if (!dbName) return;
 
-  const [columnRows] = await pool.query<mysql.RowDataPacket[]>(
+  // The AI Tutor and Numericals features have been removed. Their tables —
+  // and the notebooks/notebook_id linkage that existed solely to scope the
+  // Tutor's RAG retrieval — are dead weight on any install created before
+  // this cleanup. Drop them so an upgraded DB matches the current schema
+  // instead of accumulating unused tables forever.
+  for (const table of ["numerical_sets", "chat_messages", "chat_faq_cache", "notebooks"] as const) {
+    await pool.query(`DROP TABLE IF EXISTS ${table}`);
+  }
+
+  const [syllabiColumnRows] = await pool.query<mysql.RowDataPacket[]>(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'syllabi'`,
     [dbName],
   );
-  const existingColumns = new Set(columnRows.map((r) => r.COLUMN_NAME as string));
-
-  if (!existingColumns.has("notebook_id")) {
-    await pool.query(`ALTER TABLE syllabi ADD COLUMN notebook_id VARCHAR(64)`);
-    // Index creation can fail harmlessly if it somehow already exists —
-    // don't let that abort startup.
+  const existingSyllabiColumns = new Set(syllabiColumnRows.map((r) => r.COLUMN_NAME as string));
+  if (existingSyllabiColumns.has("notebook_id")) {
     try {
-      await pool.query(`ALTER TABLE syllabi ADD INDEX idx_syllabi_notebook (notebook_id)`);
+      await pool.query(`ALTER TABLE syllabi DROP INDEX idx_syllabi_notebook`);
     } catch {
-      /* index already present — ignore */
+      /* index already absent — ignore */
     }
+    await pool.query(`ALTER TABLE syllabi DROP COLUMN notebook_id`);
   }
 
   // Every route that writes user_id now requires a real Clerk session (see
@@ -300,35 +243,6 @@ async function migrateSchema(pool: mysql.Pool): Promise<void> {
       await pool.query(`ALTER TABLE ${table} ALTER COLUMN user_id DROP DEFAULT`);
     }
   }
-
-  // sources_json added so citation badges survive a page reload (previously
-  // only shown for the live, in-session answer — see CHANGES.md).
-  const [chatColumnRows] = await pool.query<mysql.RowDataPacket[]>(
-    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'chat_messages'`,
-    [dbName],
-  );
-  const existingChatColumns = new Set(chatColumnRows.map((r) => r.COLUMN_NAME as string));
-  if (!existingChatColumns.has("sources_json")) {
-    await pool.query(`ALTER TABLE chat_messages ADD COLUMN sources_json LONGTEXT`);
-  }
-}
-
-/**
- * Looks up the notebook a syllabus belongs to (every syllabus auto-creates
- * one on upload). Returns null if the syllabus is unknown or predates the
- * notebooks feature — callers should treat that as "use the legacy global
- * RAG collection" rather than an error.
- */
-export async function getNotebookIdForSyllabus(syllabusId: string): Promise<string | null> {
-  await initDb();
-  const pool = getPool();
-  const [rows] = await pool.query(
-    `SELECT notebook_id FROM syllabi WHERE id = ? LIMIT 1`,
-    [syllabusId],
-  );
-  const row = (rows as Array<{ notebook_id: string | null }>)[0];
-  return row?.notebook_id ?? null;
 }
 
 // ── Personalized Learning ───────────────────────────────────────────────────
@@ -353,7 +267,7 @@ export interface RecordAttemptInput {
   topicId: string;
   topicName: string;
   subject: string;
-  contentType: "mcq" | "numerical";
+  contentType: "mcq";
   difficulty: "easy" | "medium" | "hard";
   isCorrect: boolean;
 }
@@ -643,69 +557,6 @@ export async function getReferenceMaterials(syllabusId: string): Promise<Referen
     [syllabusId],
   );
   return rows as ReferenceMaterial[];
-}
-
-// ── Tutor Chat FAQ cache ──────────────────────────────────────────────────
-
-/**
- * Fuzzy-normalizes a question for cache matching: lowercase, trim, strip
- * punctuation, collapse whitespace. "What is Polymorphism?" and
- * "what is polymorphism" both normalize to "what is polymorphism", so
- * near-identical repeat questions still hit the cache.
- */
-export function normalizeQuestion(question: string): string {
-  return question
-    .toLowerCase()
-    .trim()
-    .replace(/[^\p{L}\p{N}\s]/gu, "") // strip punctuation, keep letters/numbers/whitespace
-    .replace(/\s+/g, " ")
-    .slice(0, 512);
-}
-
-/** Returns the cached tutor response for this (topic, normalized question) pair, if any. */
-export async function getCachedFaqAnswer(
-  topicId: string,
-  questionNormalized: string,
-): Promise<Record<string, unknown> | null> {
-  await initDb();
-  const pool = getPool();
-  const [rows] = await pool.query<mysql.RowDataPacket[]>(
-    `SELECT response_json FROM chat_faq_cache WHERE topic_id = ? AND question_normalized = ?`,
-    [topicId, questionNormalized],
-  );
-  if (!rows.length) return null;
-
-  // Best-effort hit-count bump — doesn't need to block the response.
-  pool
-    .query(
-      `UPDATE chat_faq_cache SET hit_count = hit_count + 1 WHERE topic_id = ? AND question_normalized = ?`,
-      [topicId, questionNormalized],
-    )
-    .catch(() => {});
-
-  try {
-    return JSON.parse(rows[0].response_json as string);
-  } catch {
-    return null;
-  }
-}
-
-/** Upserts a fresh LLM answer into the FAQ cache. Best-effort — never let this fail the request. */
-export async function upsertFaqCache(input: {
-  topicId: string;
-  questionNormalized: string;
-  questionOriginal: string;
-  response: unknown;
-}): Promise<void> {
-  await initDb();
-  const pool = getPool();
-  const id = randomUUID();
-  await pool.query(
-    `INSERT INTO chat_faq_cache (id, topic_id, question_normalized, question_original, response_json)
-     VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE response_json = VALUES(response_json), hit_count = hit_count + 1`,
-    [id, input.topicId, input.questionNormalized, input.questionOriginal, JSON.stringify(input.response)],
-  );
 }
 
 export interface RevisionItem {

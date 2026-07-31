@@ -1,22 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { FileText, Calculator, HelpCircle, ChevronLeft, Maximize2, Loader2, List, MessageSquare, X } from "lucide-react";
+import { FileText, HelpCircle, ChevronLeft, Loader2, List, X } from "lucide-react";
 import { SyllabusTree } from "@/components/SyllabusTree";
 import { NotesView } from "@/components/NotesView";
-import { NumericalsView } from "@/components/NumericalsView";
 import { MCQQuiz } from "@/components/MCQQuiz";
-import { ChatPanel } from "@/components/ChatPanel";
 import { getLatestSyllabus } from "@/lib/api";
 import type { Syllabus, SyllabusTopic } from "@/types";
 import Link from "next/link";
 
-type Tab = "notes" | "problems" | "mcq";
+type Tab = "notes" | "mcq";
 
 const TABS: { id: Tab; label: string; icon: typeof FileText }[] = [
-  { id: "notes",    label: "Notes",    icon: FileText   },
-  { id: "problems", label: "Problems", icon: Calculator },
-  { id: "mcq",      label: "Quiz",     icon: HelpCircle },
+  { id: "notes", label: "Notes", icon: FileText   },
+  { id: "mcq",   label: "Quiz",  icon: HelpCircle },
 ];
 
 interface ResolvedTopic extends SyllabusTopic {
@@ -43,12 +40,11 @@ function resolveTopic(syllabus: Syllabus, topicId: string): { topic: ResolvedTop
 export default function StudyPage() {
   const { topicId } = useParams<{ topicId: string }>();
   const [activeTab, setActiveTab] = useState<Tab>("notes");
-  const [chatExpanded, setChatExpanded] = useState(false);
   const [syllabus, setSyllabus] = useState<Syllabus | null>(null);
   const [loadError, setLoadError] = useState(false);
-  // Mobile-only: the syllabus tree and tutor panel are hidden below md/lg
-  // breakpoints, so they need to be reachable as overlays instead.
-  const [mobilePanel, setMobilePanel] = useState<"syllabus" | "tutor" | null>(null);
+  // Mobile-only: the syllabus tree is hidden below the lg breakpoint, so it
+  // needs to be reachable as an overlay instead.
+  const [mobileSyllabusOpen, setMobileSyllabusOpen] = useState(false);
 
   useEffect(() => {
     getLatestSyllabus()
@@ -123,21 +119,14 @@ export default function StudyPage() {
               </button>
             ))}
           </div>
-          {/* Mobile-only access to syllabus tree and tutor, which are hidden as side panels below lg/md */}
+          {/* Mobile-only access to the syllabus tree, hidden as a side panel below lg */}
           <div className="flex items-center gap-1 pr-3 lg:hidden">
             <button
-              onClick={() => setMobilePanel("syllabus")}
+              onClick={() => setMobileSyllabusOpen(true)}
               className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-gray-500 hover:bg-page hover:text-brand-600 transition-colors"
               aria-label="Open syllabus"
             >
               <List size={14} />
-            </button>
-            <button
-              onClick={() => setMobilePanel("tutor")}
-              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-gray-500 hover:bg-page hover:text-brand-600 transition-colors md:hidden"
-              aria-label="Open AI tutor"
-            >
-              <MessageSquare size={14} />
             </button>
           </div>
         </div>
@@ -154,16 +143,6 @@ export default function StudyPage() {
               syllabusId={syllabus?.syllabus_id}
             />
           )}
-          {activeTab === "problems" && (
-            <NumericalsView
-              topicId={topicId}
-              topicName={topic.name}
-              subject={topic.subject}
-              hasNumericals={topic.has_numericals}
-              syllabusContext={syllabusContext}
-              syllabusId={syllabus?.syllabus_id}
-            />
-          )}
           {activeTab === "mcq" && (
             <MCQQuiz
               topicId={topicId}
@@ -176,46 +155,18 @@ export default function StudyPage() {
         </div>
       </main>
 
-      {/* ── Right: Chat panel ────────────────────────────────── */}
-      <aside
-        className={`shrink-0 border-l border-border bg-surface transition-all duration-200 ${
-          chatExpanded ? "w-96" : "w-72"
-        } hidden md:flex md:flex-col`}
-      >
-        <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Tutor</span>
-          <button
-            onClick={() => setChatExpanded((v) => !v)}
-            className="rounded p-1 text-gray-400 hover:text-brand-500 transition-colors"
-          >
-            <Maximize2 size={12} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <ChatPanel
-            topicId={topicId}
-            topicName={topic.name}
-            subject={topic.subject}
-            syllabusContext={syllabusContext}
-            syllabusId={syllabus?.syllabus_id}
-          />
-        </div>
-      </aside>
-
-      {/* ── Mobile overlays: syllabus tree / tutor ─────────────── */}
-      {mobilePanel && (
+      {/* ── Mobile overlay: syllabus tree ───────────────────────── */}
+      {mobileSyllabusOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div
             className="absolute inset-0 bg-black/30"
-            onClick={() => setMobilePanel(null)}
+            onClick={() => setMobileSyllabusOpen(false)}
           />
           <div className="relative ml-auto flex h-full w-[85%] max-w-sm flex-col bg-surface shadow-xl">
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-              <span className="text-[13px] font-semibold text-gray-900">
-                {mobilePanel === "syllabus" ? "Syllabus" : "AI Tutor"}
-              </span>
+              <span className="text-[13px] font-semibold text-gray-900">Syllabus</span>
               <button
-                onClick={() => setMobilePanel(null)}
+                onClick={() => setMobileSyllabusOpen(false)}
                 className="rounded p-1 text-gray-400 hover:text-brand-500 transition-colors"
                 aria-label="Close"
               >
@@ -223,19 +174,9 @@ export default function StudyPage() {
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              {mobilePanel === "syllabus" ? (
-                <div className="h-full overflow-y-auto p-3">
-                  <SyllabusTree syllabus={syllabus!} activeTopicId={topicId} />
-                </div>
-              ) : (
-                <ChatPanel
-                  topicId={topicId}
-                  topicName={topic.name}
-                  subject={topic.subject}
-                  syllabusContext={syllabusContext}
-                  syllabusId={syllabus?.syllabus_id}
-                />
-              )}
+              <div className="h-full overflow-y-auto p-3">
+                <SyllabusTree syllabus={syllabus!} activeTopicId={topicId} />
+              </div>
             </div>
           </div>
         </div>

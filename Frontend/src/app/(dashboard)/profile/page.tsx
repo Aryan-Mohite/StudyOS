@@ -82,7 +82,7 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-screen-sm px-5 py-10">
       <h1 className="font-display text-2xl font-bold text-gray-900">Your profile</h1>
       <p className="mt-1 text-sm text-gray-500">
-        This helps StudyOS calibrate notes, MCQs, and numericals to your course and year. It&apos;s
+        This helps StudyOS calibrate notes and MCQs to your course and year. It&apos;s
         optional, but generated content will be more relevant once it&apos;s filled in.
       </p>
 
