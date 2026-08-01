@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { getUpcomingRevisions } from "@/lib/db";
+import { withApiHandler } from "@/lib/apiHandler";
 
 // ── GET /api/revision ────────────────────────────────────────────────────────
 // Topics due for spaced-repetition revision in the next 7 days (overdue first).
-export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ detail: "Not signed in." }, { status: 401 });
-  }
-  const items = await getUpcomingRevisions(userId);
-  return NextResponse.json({ items });
-}
+export const GET = withApiHandler(
+  async (_req, ctx) => {
+    const items = await getUpcomingRevisions(ctx.userId as string);
+    return NextResponse.json({ items });
+  },
+  { rateLimit: "read" },
+);

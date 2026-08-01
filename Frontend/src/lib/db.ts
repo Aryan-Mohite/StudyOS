@@ -16,24 +16,31 @@
  */
 
 import mysql from "mysql2/promise";
+import { getEnv } from "./env";
 
 let _pool: mysql.Pool | null = null;
 
 export function getPool(): mysql.Pool {
   if (_pool) return _pool;
 
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      "DATABASE_URL is not set. Add it to Frontend/.env.local — see .env.local.example.",
-    );
-  }
+  const env = getEnv();
 
   _pool = mysql.createPool({
-    uri: url,
+    uri: env.DATABASE_URL,
     waitForConnections: true,
-    connectionLimit: 10,
+    // Configurable via DB_POOL_SIZE — default 10 is fine for the single-VPS
+    // deployment this project is planned for (see ARCHITECTURE.md); raise it
+    // if profiling shows requests queueing for a connection under load.
+    connectionLimit: env.DB_POOL_SIZE,
     queueLimit: 0,
+    // Detects and drops dead connections (e.g. after a MySQL restart or an
+    // idle-connection timeout on a managed provider) instead of handing out
+    // a connection that will fail on first use.
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10_000,
+    // Fail fast on a hung connection attempt rather than let a request hang
+    // indefinitely waiting on the pool.
+    connectTimeout: 10_000,
   });
 
   return _pool;

@@ -10,6 +10,8 @@
  *   AGENTIC_SERVICE_URL=http://localhost:8000                    (dev)
  */
 
+import { getServiceToken } from "./serviceAuth";
+
 const AGENTIC = process.env.AGENTIC_SERVICE_URL ?? "http://localhost:8000";
 
 export class AgenticError extends Error {
@@ -44,6 +46,7 @@ export async function parseSyllabus(file: File): Promise<unknown> {
 
   const res = await fetch(`${AGENTIC}/agent/parse-syllabus`, {
     method: "POST",
+    headers: { Authorization: `Bearer ${await getServiceToken()}` },
     body: form,
     // 210s budget: covers the OCR fallback path (several seconds/page for
     // scanned PDFs, up to 40 pages) plus the LLM parse call.
@@ -63,6 +66,7 @@ export async function ingestReferenceMaterial(
 
   const res = await fetch(`${AGENTIC}/agent/ingest-reference-material`, {
     method: "POST",
+    headers: { Authorization: `Bearer ${await getServiceToken()}` },
     body: form,
     // Same budget as syllabus parsing — covers the OCR fallback path for
     // scanned reference PDFs plus embedding/indexing time.
@@ -86,7 +90,7 @@ export async function generateNotes(
 ): Promise<{ note_id: string; [key: string]: unknown }> {
   const res = await fetch(`${AGENTIC}/agent/generate-notes`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await getServiceToken()}` },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(90_000),
   });
@@ -109,7 +113,7 @@ export async function generateMCQ(
 ): Promise<{ mcq_set_id: string; [key: string]: unknown }> {
   const res = await fetch(`${AGENTIC}/agent/generate-mcq`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await getServiceToken()}` },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(90_000),
   });
@@ -127,7 +131,7 @@ export async function generateStudyPlan(
 ): Promise<{ study_plan_id: string; [key: string]: unknown }> {
   const res = await fetch(`${AGENTIC}/agent/generate-study-plan`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await getServiceToken()}` },
     body: JSON.stringify(payload),
     // Plans can span many days/topics — allow more budget than MCQ generation.
     signal: AbortSignal.timeout(120_000),

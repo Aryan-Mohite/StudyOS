@@ -1,39 +1,42 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getPool, initDb } from "@/lib/db";
+import { withApiHandler } from "@/lib/apiHandler";
 import type { RowDataPacket } from "mysql2";
 
+type RouteParams = { params: Promise<{ topicId: string }> };
+
 // ── GET /api/mcq/:topicId ─────────────────────────────────────────────────────
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ topicId: string }> },
-) {
-  await initDb();
-  const { topicId } = await params;
-  const pool = getPool();
+export const GET = withApiHandler<RouteParams>(
+  async (_req, _ctx, { params }) => {
+    await initDb();
+    const { topicId } = await params;
+    const pool = getPool();
 
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT content_json FROM mcq_sets
-     WHERE topic_id = ?
-     ORDER BY created_at DESC LIMIT 1`,
-    [topicId],
-  );
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT content_json FROM mcq_sets
+       WHERE topic_id = ?
+       ORDER BY created_at DESC LIMIT 1`,
+      [topicId],
+    );
 
-  const row = rows[0];
-  if (!row) {
-    return NextResponse.json({ detail: "MCQ set not found for this topic." }, { status: 404 });
-  }
-  return NextResponse.json(JSON.parse(row.content_json));
-}
+    const row = rows[0];
+    if (!row) {
+      return NextResponse.json({ detail: "MCQ set not found for this topic." }, { status: 404 });
+    }
+    return NextResponse.json(JSON.parse(row.content_json));
+  },
+  { rateLimit: "read" },
+);
 
 // ── DELETE /api/mcq/:topicId ──────────────────────────────────────────────────
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ topicId: string }> },
-) {
-  await initDb();
-  const { topicId } = await params;
-  const pool = getPool();
+export const DELETE = withApiHandler<RouteParams>(
+  async (_req, _ctx, { params }) => {
+    await initDb();
+    const { topicId } = await params;
+    const pool = getPool();
 
-  await pool.query(`DELETE FROM mcq_sets WHERE topic_id = ?`, [topicId]);
-  return NextResponse.json({ deleted: true, topic_id: topicId });
-}
+    await pool.query(`DELETE FROM mcq_sets WHERE topic_id = ?`, [topicId]);
+    return NextResponse.json({ deleted: true, topic_id: topicId });
+  },
+  { rateLimit: "write" },
+);
