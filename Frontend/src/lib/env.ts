@@ -23,6 +23,12 @@ const envSchema = z.object({
   ),
   DB_POOL_SIZE: z.coerce.number().int().positive().default(10),
 
+  // Optional. Managed MySQL providers that enforce TLS (Aiven, PlanetScale,
+  // etc.) issue a CA certificate — paste its full PEM contents here
+  // (including the -----BEGIN/END CERTIFICATE----- lines). Leave unset for
+  // local/unencrypted MySQL. See db.ts for how this is applied.
+  DB_SSL_CA: z.string().optional(),
+
   // -- AgenticService --
   AGENTIC_SERVICE_URL: z.string().url().default("http://localhost:8000"),
 

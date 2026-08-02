@@ -10,7 +10,7 @@ a real failure the caller needs to know about — a bad reference upload
 should surface to the student, not fail silently.
 
 Call run_reference_ingestion() once per uploaded file. Multiple files for
-the same syllabus_id land in the same Chroma collection (see
+the same syllabus_id land in the same Qdrant collection (see
 rag_service.index_reference_material) — loop at the call site (main.py)
 for multi-file upload.
 """

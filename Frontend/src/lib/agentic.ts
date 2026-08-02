@@ -6,7 +6,7 @@
  * client components, since AGENTIC_SERVICE_URL is an internal-only address.
  *
  * Configure via AGENTIC_SERVICE_URL in .env.local, e.g.:
- *   AGENTIC_SERVICE_URL=https://studyos-agentic.up.railway.app   (prod)
+ *   AGENTIC_SERVICE_URL=https://studyos-agentic.onrender.com     (prod)
  *   AGENTIC_SERVICE_URL=http://localhost:8000                    (dev)
  */
 

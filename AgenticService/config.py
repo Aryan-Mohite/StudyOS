@@ -28,8 +28,15 @@ class Settings(BaseSettings):
     gemini_model_name: str = "gemini-2.0-flash"
     anthropic_model_name: str = "claude-sonnet-4-6"
 
-    # RAG config (replaces the old "Assets" folder — persistent vector store on disk)
-    vector_db_dir: str = "vector_db"
+    # RAG config (replaces the old "Assets" folder — persistent vector store)
+    # Leave QDRANT_URL unset for local dev — rag_service.py falls back to an
+    # embedded on-disk Qdrant instance at QDRANT_LOCAL_PATH (zero setup, but
+    # ephemeral if the host's disk is ephemeral, e.g. Render free tier). Set
+    # QDRANT_URL + QDRANT_API_KEY (Qdrant Cloud free tier, or any self-hosted
+    # Qdrant) for storage that survives backend restarts/redeploys.
+    qdrant_url: str = ""
+    qdrant_api_key: str = ""
+    qdrant_local_path: str = "vector_db"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     # ── Security ─────────────────────────────────────────────────────────
@@ -65,6 +72,20 @@ class Settings(BaseSettings):
             )
         if self.env == "production" and not self.internal_service_jwt_secret:
             _fail("INTERNAL_SERVICE_JWT_SECRET must be set in production — refusing to start unauthenticated.")
+        if self.env == "production" and not self.qdrant_url:
+            # Deliberately a warning, not _fail(): local-path Qdrant still
+            # works, it just won't survive a restart on ephemeral-disk hosts.
+            # That's a real but non-fatal footgun, so it's logged loudly
+            # instead of blocking startup (e.g. someone deploying to a host
+            # WITH persistent disk legitimately doesn't need Qdrant Cloud).
+            print(
+                "[config] WARNING: ENV=production but QDRANT_URL is not set — "
+                "reference-material RAG data will be stored at QDRANT_LOCAL_PATH "
+                "and will NOT survive a restart on hosts with ephemeral disk "
+                "(e.g. Render's free tier). Set QDRANT_URL/QDRANT_API_KEY "
+                "(Qdrant Cloud free tier) if that matters for your deployment.",
+                file=sys.stderr,
+            )
         return self
 
 

@@ -11,8 +11,9 @@
  * Configure via DATABASE_URL in .env.local, e.g.:
  *   DATABASE_URL=mysql://user:password@host:3306/studyos
  *
- * Or PlanetScale / Railway / Aiven connection strings work the same way
- * (add ?ssl={"rejectUnauthorized":true} if your provider requires SSL).
+ * Works with PlanetScale / Railway / Aiven / local MySQL. Managed providers
+ * that enforce TLS (Aiven does) need DB_SSL_CA set too — see env.ts and the
+ * ssl option below.
  */
 
 import mysql from "mysql2/promise";
@@ -41,6 +42,12 @@ export function getPool(): mysql.Pool {
     // Fail fast on a hung connection attempt rather than let a request hang
     // indefinitely waiting on the pool.
     connectTimeout: 10_000,
+    // Aiven (and most managed MySQL providers) enforce TLS and won't accept
+    // connections without it. If DB_SSL_CA is set, verify against it
+    // properly; otherwise fall back to rejectUnauthorized (works if the
+    // provider's cert chains to a publicly trusted CA — check your
+    // provider's docs if connections fail with a cert error).
+    ssl: env.DB_SSL_CA ? { ca: env.DB_SSL_CA, rejectUnauthorized: true } : undefined,
   });
 
   return _pool;

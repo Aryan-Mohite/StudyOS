@@ -6,22 +6,36 @@ knowledge alone.
 
 Embeddings run locally via sentence-transformers (no extra paid API,
 consistent with "lean infra until justified").
+
+Vector storage backend: Qdrant.
+  - QDRANT_URL set (Qdrant Cloud free tier, or any self-hosted Qdrant) ->
+    connects over HTTP, storage lives outside this process entirely.
+  - QDRANT_URL unset (default, local dev) -> embedded on-disk Qdrant at
+    QDRANT_LOCAL_PATH, zero setup required. Same caveat local Chroma had:
+    if the host's disk is ephemeral (e.g. Render's free tier), this data
+    does not survive a restart. See config.py's production warning.
 """
 
 from pathlib import Path
 from typing import Optional
 
-from langchain_chroma import Chroma
+from langchain_qdrant import QdrantVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qdrant_models
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from config import settings
 
-_VECTOR_DIR = Path(__file__).parent.parent.parent / settings.vector_db_dir
-_VECTOR_DIR.mkdir(parents=True, exist_ok=True)
+# all-MiniLM-L6-v2 (the default embedding_model) produces 384-dim vectors.
+# If you change EMBEDDING_MODEL, update this to match, or collection
+# creation below will silently store the wrong dimensionality.
+_EMBEDDING_DIM = 384
 
 _embeddings: Optional[HuggingFaceEmbeddings] = None
+_client: Optional[QdrantClient] = None
 
 
 def _get_embeddings() -> HuggingFaceEmbeddings:
@@ -31,12 +45,29 @@ def _get_embeddings() -> HuggingFaceEmbeddings:
     return _embeddings
 
 
+def _get_client() -> QdrantClient:
+    global _client
+    if _client is not None:
+        return _client
+
+    if settings.qdrant_url:
+        _client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None)
+    else:
+        # Embedded mode: Qdrant's own storage engine running in-process,
+        # persisted to a local path — no separate server needed. This is
+        # the direct equivalent of Chroma's old persist_directory behavior.
+        local_dir = Path(__file__).parent.parent.parent / settings.qdrant_local_path
+        local_dir.mkdir(parents=True, exist_ok=True)
+        _client = QdrantClient(path=str(local_dir))
+    return _client
+
+
 # ── User-uploaded reference material (optional, per-syllabus) ─────────────────
 #
 # Whatever a student optionally uploads (textbook chapters, lecture PDFs,
 # past-paper solutions) for THEIR syllabus, so Notes/MCQ generation can be
 # grounded in real source material instead of LLM trained knowledge alone.
-# One Chroma collection per syllabus_id; multiple uploaded files land in the
+# One Qdrant collection per syllabus_id; multiple uploaded files land in the
 # same collection (metadata tags which file each chunk came from) — indexed
 # together, not kept separate.
 
@@ -44,19 +75,37 @@ _reference_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_over
 
 
 def _reference_collection_name(syllabus_id: str) -> str:
-    # Chroma collection names must be alnum/underscore/hyphen; syllabus_id is
-    # expected to be a uuid already, but strip defensively regardless.
+    # Keep the same sanitization Chroma required (alnum/underscore/hyphen)
+    # even though Qdrant is more permissive — syllabus_id is expected to be
+    # a uuid already, this is just defensive.
     safe_id = "".join(c for c in syllabus_id if c.isalnum() or c in "-_")
     if not safe_id:
         raise ValueError("syllabus_id must contain at least one alnum/-/_ character")
     return f"studyos_reference_{safe_id}"
 
 
-def _get_reference_store(syllabus_id: str) -> Chroma:
-    return Chroma(
-        collection_name=_reference_collection_name(syllabus_id),
-        embedding_function=_get_embeddings(),
-        persist_directory=str(_VECTOR_DIR),
+def _ensure_collection(client: QdrantClient, name: str) -> None:
+    """Creates the collection if it doesn't exist yet. Idempotent — safe to call on every write."""
+    try:
+        client.get_collection(name)
+    except (UnexpectedResponse, ValueError):
+        client.create_collection(
+            collection_name=name,
+            vectors_config=qdrant_models.VectorParams(
+                size=_EMBEDDING_DIM,
+                distance=qdrant_models.Distance.COSINE,
+            ),
+        )
+
+
+def _get_reference_store(syllabus_id: str) -> QdrantVectorStore:
+    client = _get_client()
+    name = _reference_collection_name(syllabus_id)
+    _ensure_collection(client, name)
+    return QdrantVectorStore(
+        client=client,
+        collection_name=name,
+        embedding=_get_embeddings(),
     )
 
 
@@ -116,7 +165,9 @@ def retrieve_reference_context(syllabus_id: str, query: str, k: int = 4) -> list
 def has_reference_material(syllabus_id: str) -> bool:
     """Cheap existence check — used to decide whether retrieval is worth attempting."""
     try:
-        store = _get_reference_store(syllabus_id)
-        return store._collection.count() > 0
+        client = _get_client()
+        name = _reference_collection_name(syllabus_id)
+        count = client.count(collection_name=name, exact=True)
+        return count.count > 0
     except Exception:
         return False
