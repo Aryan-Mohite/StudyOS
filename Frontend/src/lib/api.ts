@@ -160,38 +160,38 @@ export async function submitAttempt(input: AttemptSubmitInput): Promise<AttemptR
   });
 }
 
-export async function getProgress(): Promise<{ topics: TopicMastery[]; overall_accuracy: number | null; total_attempts: number }> {
-  return request("/api/progress");
+export async function getProgress(syllabusId: string): Promise<{ topics: TopicMastery[]; overall_accuracy: number | null; total_attempts: number }> {
+  return request(`/api/progress?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
-export async function getDailyGoal(): Promise<DailyGoal> {
-  return request<DailyGoal>("/api/goals/daily");
+export async function getDailyGoal(syllabusId: string): Promise<DailyGoal> {
+  return request<DailyGoal>(`/api/goals/daily?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
-export async function updateDailyGoal(targetQuestions: number): Promise<DailyGoal> {
+export async function updateDailyGoal(syllabusId: string, targetQuestions: number): Promise<DailyGoal> {
   return request<DailyGoal>("/api/goals/daily", {
     method: "POST",
-    body: JSON.stringify({ target_questions: targetQuestions }),
+    body: JSON.stringify({ syllabus_id: syllabusId, target_questions: targetQuestions }),
   });
 }
 
-export async function getWeeklyGoal(): Promise<WeeklyGoal> {
-  return request<WeeklyGoal>("/api/goals/weekly");
+export async function getWeeklyGoal(syllabusId: string): Promise<WeeklyGoal> {
+  return request<WeeklyGoal>(`/api/goals/weekly?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
-export async function updateWeeklyGoal(targetTopics: number): Promise<WeeklyGoal> {
+export async function updateWeeklyGoal(syllabusId: string, targetTopics: number): Promise<WeeklyGoal> {
   return request<WeeklyGoal>("/api/goals/weekly", {
     method: "POST",
-    body: JSON.stringify({ target_topics: targetTopics }),
+    body: JSON.stringify({ syllabus_id: syllabusId, target_topics: targetTopics }),
   });
 }
 
-export async function getRevisionSchedule(): Promise<{ items: RevisionItem[] }> {
-  return request("/api/revision");
+export async function getRevisionSchedule(syllabusId: string): Promise<{ items: RevisionItem[] }> {
+  return request(`/api/revision?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
-export async function getDashboardAnalytics(): Promise<DashboardAnalytics> {
-  return request<DashboardAnalytics>("/api/analytics/dashboard");
+export async function getDashboardAnalytics(syllabusId: string): Promise<DashboardAnalytics> {
+  return request<DashboardAnalytics>(`/api/analytics/dashboard?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
 export async function getSuggestedDifficulty(topicId: string): Promise<SuggestedDifficulty> {

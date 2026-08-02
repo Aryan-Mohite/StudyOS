@@ -103,16 +103,22 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
     setStatus("question_answered");
 
     const question = data.questions[currentIndex];
-    // Fire-and-forget: recording the attempt shouldn't block or interrupt the quiz.
-    submitAttempt({
-      topic_id: topicId,
-      topic_name: topicName,
-      subject,
-      syllabus_id: syllabusId,
-      content_type: "mcq",
-      difficulty: question.difficulty,
-      is_correct: option === question.correct,
-    }).catch(() => { /* progress tracking is best-effort */ });
+    // Fire-and-forget: recording the attempt shouldn't block or interrupt the
+    // quiz. syllabusId should always be set by the time a student can answer
+    // (the study page waits on the syllabus before rendering this component
+    // at all) — but skip rather than send a malformed request if it's ever
+    // missing, since progress tracking is best-effort.
+    if (syllabusId) {
+      submitAttempt({
+        topic_id: topicId,
+        topic_name: topicName,
+        subject,
+        syllabus_id: syllabusId,
+        content_type: "mcq",
+        difficulty: question.difficulty,
+        is_correct: option === question.correct,
+      }).catch(() => { /* progress tracking is best-effort */ });
+    }
   };
 
   const handleNext = () => {

@@ -46,6 +46,26 @@ export function getPool(): mysql.Pool {
   return _pool;
 }
 
+const CREATE_DAILY_GOALS = `
+CREATE TABLE IF NOT EXISTS daily_goals (
+  user_id              VARCHAR(128) NOT NULL,
+  syllabus_id          VARCHAR(64) NOT NULL,
+  goal_date             DATE NOT NULL,
+  target_questions      INT NOT NULL DEFAULT 10,
+  completed_questions   INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, syllabus_id, goal_date)
+)`;
+
+const CREATE_WEEKLY_GOALS = `
+CREATE TABLE IF NOT EXISTS weekly_goals (
+  user_id            VARCHAR(128) NOT NULL,
+  syllabus_id        VARCHAR(64) NOT NULL,
+  week_start         DATE NOT NULL,       -- Monday of the target week
+  target_topics      INT NOT NULL DEFAULT 5,
+  completed_topics    INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, syllabus_id, week_start)
+)`;
+
 const CREATE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS user_profile (
   user_id          VARCHAR(128) PRIMARY KEY,
@@ -147,21 +167,13 @@ CREATE TABLE IF NOT EXISTS revision_schedule (
   INDEX idx_revision_user_date (user_id, next_review_date)
 );
 
-CREATE TABLE IF NOT EXISTS daily_goals (
-  user_id              VARCHAR(128) NOT NULL,
-  goal_date             DATE NOT NULL,
-  target_questions      INT NOT NULL DEFAULT 10,
-  completed_questions   INT NOT NULL DEFAULT 0,
-  PRIMARY KEY (user_id, goal_date)
-);
+-- Scoped per (user, syllabus) rather than just per user — a daily/weekly
+-- goal and the streak derived from it are "how am I doing on THIS
+-- syllabus", not one continuous counter that bleeds into whatever syllabus
+-- the student uploads next.
+${CREATE_DAILY_GOALS};
 
-CREATE TABLE IF NOT EXISTS weekly_goals (
-  user_id            VARCHAR(128) NOT NULL,
-  week_start         DATE NOT NULL,       -- Monday of the target week
-  target_topics      INT NOT NULL DEFAULT 5,
-  completed_topics    INT NOT NULL DEFAULT 0,
-  PRIMARY KEY (user_id, week_start)
-);
+${CREATE_WEEKLY_GOALS};
 
 -- ── Reference material ───────────────────────────────────────────────────
 -- The AgenticService indexes the actual PDF text into a per-syllabus Chroma
@@ -250,6 +262,47 @@ async function migrateSchema(pool: mysql.Pool): Promise<void> {
       await pool.query(`ALTER TABLE ${table} ALTER COLUMN user_id DROP DEFAULT`);
     }
   }
+
+  // daily_goals/weekly_goals moved from "one counter per user" to "one
+  // counter per (user, syllabus)" — see the multi-notebook isolation fix.
+  // Old rows can't be attributed to a syllabus after the fact, and this
+  // project has no production data yet, so an existing table on the old
+  // schema is dropped and rebuilt empty rather than migrated in place.
+  for (const table of ["daily_goals", "weekly_goals"] as const) {
+    const [colRows] = await pool.query<mysql.RowDataPacket[]>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
+      [dbName, table],
+    );
+    const exists = colRows.length > 0;
+    const hasSyllabusId = colRows.some((r) => r.COLUMN_NAME === "syllabus_id");
+    if (exists && !hasSyllabusId) {
+      await pool.query(`DROP TABLE IF EXISTS ${table}`);
+    }
+  }
+  // Re-run the two CREATE TABLE IF NOT EXISTS statements so a table just
+  // dropped above (or missing on a fresh DB that hit this function before
+  // CREATE_SCHEMA somehow didn't create it) exists again before any query
+  // in this same process tries to use it.
+  await pool.query(CREATE_DAILY_GOALS);
+  await pool.query(CREATE_WEEKLY_GOALS);
+}
+
+/**
+ * True if `syllabusId` was uploaded by `userId`. Every route that scopes
+ * personalized-learning data (progress, goals, revisions, dashboard) to a
+ * syllabus_id supplied by the client calls this first, the same way
+ * /api/reference and /api/plan/generate already verify ownership before
+ * trusting a client-supplied syllabus_id.
+ */
+export async function syllabusBelongsToUser(syllabusId: string, userId: string): Promise<boolean> {
+  await initDb();
+  const pool = getPool();
+  const [rows] = await pool.query(`SELECT 1 FROM syllabi WHERE id = ? AND user_id = ? LIMIT 1`, [
+    syllabusId,
+    userId,
+  ]);
+  return (rows as unknown[]).length > 0;
 }
 
 // ── Personalized Learning ───────────────────────────────────────────────────
@@ -270,7 +323,7 @@ function weekStartStr(): string {
 
 export interface RecordAttemptInput {
   userId: string;
-  syllabusId?: string | null;
+  syllabusId: string;
   topicId: string;
   topicName: string;
   subject: string;
@@ -303,7 +356,7 @@ export async function recordAttempt(input: RecordAttemptInput): Promise<AttemptR
   await pool.query(
     `INSERT INTO attempts (user_id, syllabus_id, topic_id, topic_name, subject, content_type, difficulty, is_correct)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, syllabusId ?? null, topicId, topicName, subject, contentType, difficulty, correctInt],
+    [userId, syllabusId, topicId, topicName, subject, contentType, difficulty, correctInt],
   );
 
   await pool.query(
@@ -314,7 +367,7 @@ export async function recordAttempt(input: RecordAttemptInput): Promise<AttemptR
        correct_attempts = correct_attempts + VALUES(correct_attempts),
        mastery_score = ROUND(100 * (correct_attempts + VALUES(correct_attempts)) / (total_attempts + 1), 2),
        last_attempted_at = NOW()`,
-    [userId, topicId, topicName, subject, syllabusId ?? null, correctInt, isCorrect ? 100 : 0],
+    [userId, topicId, topicName, subject, syllabusId, correctInt, isCorrect ? 100 : 0],
   );
 
   const [masteryRows] = await pool.query(
@@ -342,14 +395,14 @@ export async function recordAttempt(input: RecordAttemptInput): Promise<AttemptR
        interval_days = VALUES(interval_days),
        next_review_date = VALUES(next_review_date),
        last_reviewed_at = NOW()`,
-    [userId, topicId, topicName, subject, syllabusId ?? null, nextInterval, nextReviewStr],
+    [userId, topicId, topicName, subject, syllabusId, nextInterval, nextReviewStr],
   );
 
   await pool.query(
-    `INSERT INTO daily_goals (user_id, goal_date, completed_questions)
-     VALUES (?, ?, 1)
+    `INSERT INTO daily_goals (user_id, syllabus_id, goal_date, completed_questions)
+     VALUES (?, ?, ?, 1)
      ON DUPLICATE KEY UPDATE completed_questions = completed_questions + 1`,
-    [userId, todayStr()],
+    [userId, syllabusId, todayStr()],
   );
 
   return {
@@ -385,17 +438,17 @@ export interface DailyGoal {
   completed_questions: number;
 }
 
-export async function getOrCreateDailyGoal(userId: string): Promise<DailyGoal> {
+export async function getOrCreateDailyGoal(userId: string, syllabusId: string): Promise<DailyGoal> {
   await initDb();
   const pool = getPool();
   const date = todayStr();
   await pool.query(
-    `INSERT IGNORE INTO daily_goals (user_id, goal_date) VALUES (?, ?)`,
-    [userId, date],
+    `INSERT IGNORE INTO daily_goals (user_id, syllabus_id, goal_date) VALUES (?, ?, ?)`,
+    [userId, syllabusId, date],
   );
   const [rows] = await pool.query(
-    `SELECT goal_date, target_questions, completed_questions FROM daily_goals WHERE user_id = ? AND goal_date = ?`,
-    [userId, date],
+    `SELECT goal_date, target_questions, completed_questions FROM daily_goals WHERE user_id = ? AND syllabus_id = ? AND goal_date = ?`,
+    [userId, syllabusId, date],
   );
   const row = (rows as Array<{ goal_date: string; target_questions: number; completed_questions: number }>)[0];
   return {
@@ -405,17 +458,17 @@ export async function getOrCreateDailyGoal(userId: string): Promise<DailyGoal> {
   };
 }
 
-export async function setDailyGoalTarget(userId: string, targetQuestions: number): Promise<DailyGoal> {
+export async function setDailyGoalTarget(userId: string, syllabusId: string, targetQuestions: number): Promise<DailyGoal> {
   await initDb();
   const pool = getPool();
   const date = todayStr();
   await pool.query(
-    `INSERT INTO daily_goals (user_id, goal_date, target_questions)
-     VALUES (?, ?, ?)
+    `INSERT INTO daily_goals (user_id, syllabus_id, goal_date, target_questions)
+     VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE target_questions = VALUES(target_questions)`,
-    [userId, date, targetQuestions],
+    [userId, syllabusId, date, targetQuestions],
   );
-  return getOrCreateDailyGoal(userId);
+  return getOrCreateDailyGoal(userId, syllabusId);
 }
 
 export interface WeeklyGoal {
@@ -424,25 +477,26 @@ export interface WeeklyGoal {
   completed_topics: number;
 }
 
-export async function getOrCreateWeeklyGoal(userId: string): Promise<WeeklyGoal> {
+export async function getOrCreateWeeklyGoal(userId: string, syllabusId: string): Promise<WeeklyGoal> {
   await initDb();
   const pool = getPool();
   const weekStart = weekStartStr();
   await pool.query(
-    `INSERT IGNORE INTO weekly_goals (user_id, week_start) VALUES (?, ?)`,
-    [userId, weekStart],
+    `INSERT IGNORE INTO weekly_goals (user_id, syllabus_id, week_start) VALUES (?, ?, ?)`,
+    [userId, syllabusId, weekStart],
   );
-  // Distinct topics attempted this week — computed from attempts rather than
-  // tracked incrementally, since "distinct" can't be done with a simple counter.
+  // Distinct topics attempted this week for THIS syllabus — computed from
+  // attempts rather than tracked incrementally, since "distinct" can't be
+  // done with a simple counter.
   const [countRows] = await pool.query(
-    `SELECT COUNT(DISTINCT topic_id) AS c FROM attempts WHERE user_id = ? AND created_at >= ?`,
-    [userId, weekStart],
+    `SELECT COUNT(DISTINCT topic_id) AS c FROM attempts WHERE user_id = ? AND syllabus_id = ? AND created_at >= ?`,
+    [userId, syllabusId, weekStart],
   );
   const completed = (countRows as Array<{ c: number }>)[0]?.c ?? 0;
 
   const [rows] = await pool.query(
-    `SELECT week_start, target_topics FROM weekly_goals WHERE user_id = ? AND week_start = ?`,
-    [userId, weekStart],
+    `SELECT week_start, target_topics FROM weekly_goals WHERE user_id = ? AND syllabus_id = ? AND week_start = ?`,
+    [userId, syllabusId, weekStart],
   );
   const row = (rows as Array<{ week_start: string; target_topics: number }>)[0];
   return {
@@ -452,28 +506,28 @@ export async function getOrCreateWeeklyGoal(userId: string): Promise<WeeklyGoal>
   };
 }
 
-export async function setWeeklyGoalTarget(userId: string, targetTopics: number): Promise<WeeklyGoal> {
+export async function setWeeklyGoalTarget(userId: string, syllabusId: string, targetTopics: number): Promise<WeeklyGoal> {
   await initDb();
   const pool = getPool();
   const weekStart = weekStartStr();
   await pool.query(
-    `INSERT INTO weekly_goals (user_id, week_start, target_topics)
-     VALUES (?, ?, ?)
+    `INSERT INTO weekly_goals (user_id, syllabus_id, week_start, target_topics)
+     VALUES (?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE target_topics = VALUES(target_topics)`,
-    [userId, weekStart, targetTopics],
+    [userId, syllabusId, weekStart, targetTopics],
   );
-  return getOrCreateWeeklyGoal(userId);
+  return getOrCreateWeeklyGoal(userId, syllabusId);
 }
 
-/** Consecutive days (ending today or yesterday) with at least one completed question. */
-export async function getStreakDays(userId: string): Promise<number> {
+/** Consecutive days (ending today or yesterday) with at least one completed question, for this syllabus. */
+export async function getStreakDays(userId: string, syllabusId: string): Promise<number> {
   await initDb();
   const pool = getPool();
   const [rows] = await pool.query(
     `SELECT goal_date FROM daily_goals
-     WHERE user_id = ? AND completed_questions > 0
+     WHERE user_id = ? AND syllabus_id = ? AND completed_questions > 0
      ORDER BY goal_date DESC LIMIT 60`,
-    [userId],
+    [userId, syllabusId],
   );
   const dates = (rows as Array<{ goal_date: string }>).map((r) =>
     typeof r.goal_date === "string" ? r.goal_date : new Date(r.goal_date).toISOString().slice(0, 10),
@@ -510,14 +564,14 @@ export interface TopicMasteryRow {
   last_attempted_at: string;
 }
 
-/** Weakest topics first (lowest mastery), so both the dashboard and /progress can slice off the top N. */
-export async function getTopicMastery(userId: string): Promise<TopicMasteryRow[]> {
+/** Weakest topics first (lowest mastery), so both the dashboard and /progress can slice off the top N. Scoped to one syllabus so switching notebooks doesn't mix mastery data across them. */
+export async function getTopicMastery(userId: string, syllabusId: string): Promise<TopicMasteryRow[]> {
   await initDb();
   const pool = getPool();
   const [rows] = await pool.query(
     `SELECT topic_id, topic_name, subject, total_attempts, correct_attempts, mastery_score, last_attempted_at
-     FROM topic_mastery WHERE user_id = ? ORDER BY mastery_score ASC, total_attempts DESC`,
-    [userId],
+     FROM topic_mastery WHERE user_id = ? AND syllabus_id = ? ORDER BY mastery_score ASC, total_attempts DESC`,
+    [userId, syllabusId],
   );
   return (rows as Array<TopicMasteryRow & { mastery_score: string }>).map((r) => ({
     ...r,
@@ -574,16 +628,16 @@ export interface RevisionItem {
   overdue: boolean;
 }
 
-/** Topics due for revision within the next 7 days (including overdue ones), soonest first. */
-export async function getUpcomingRevisions(userId: string): Promise<RevisionItem[]> {
+/** Topics due for revision within the next 7 days (including overdue ones), soonest first, scoped to one syllabus. */
+export async function getUpcomingRevisions(userId: string, syllabusId: string): Promise<RevisionItem[]> {
   await initDb();
   const pool = getPool();
   const [rows] = await pool.query(
     `SELECT topic_id, topic_name, subject, next_review_date
      FROM revision_schedule
-     WHERE user_id = ? AND next_review_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+     WHERE user_id = ? AND syllabus_id = ? AND next_review_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
      ORDER BY next_review_date ASC`,
-    [userId],
+    [userId, syllabusId],
   );
   const today = todayStr();
   return (rows as Array<{ topic_id: string; topic_name: string; subject: string; next_review_date: string }>).map(

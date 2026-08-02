@@ -77,8 +77,8 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* Personalized learning analytics */}
-        <DashboardAnalyticsPanel />
+        {/* Personalized learning analytics — scoped to this syllabus */}
+        <DashboardAnalyticsPanel syllabusId={syllabus.syllabus_id} />
 
         {/* Quick stats */}
         <div className="mb-6 grid grid-cols-2 gap-3">

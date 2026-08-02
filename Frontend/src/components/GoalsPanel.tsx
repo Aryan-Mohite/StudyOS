@@ -5,8 +5,13 @@ import { Target, CalendarCheck, Pencil, RotateCw } from "lucide-react";
 import type { DailyGoal, WeeklyGoal, RevisionItem } from "@/types";
 import { getDailyGoal, updateDailyGoal, getWeeklyGoal, updateWeeklyGoal, getRevisionSchedule } from "@/lib/api";
 
+interface GoalsPanelProps {
+  /** Scopes daily/weekly goals and the revision queue to one syllabus. Panel renders nothing until this is known. */
+  syllabusId?: string;
+}
+
 /** Daily/weekly goal editors + spaced-repetition revision queue, for the Study Plan page. */
-export function GoalsPanel() {
+export function GoalsPanel({ syllabusId }: GoalsPanelProps) {
   const [daily, setDaily] = useState<DailyGoal | null>(null);
   const [weekly, setWeekly] = useState<WeeklyGoal | null>(null);
   const [revisions, setRevisions] = useState<RevisionItem[] | null>(null);
@@ -15,31 +20,37 @@ export function GoalsPanel() {
   const [dailyInput, setDailyInput] = useState("10");
   const [weeklyInput, setWeeklyInput] = useState("5");
 
-  const load = () => {
-    getDailyGoal().then((g) => { setDaily(g); setDailyInput(String(g.target_questions)); }).catch(() => setDaily(null));
-    getWeeklyGoal().then((g) => { setWeekly(g); setWeeklyInput(String(g.target_topics)); }).catch(() => setWeekly(null));
-    getRevisionSchedule().then((r) => setRevisions(r.items)).catch(() => setRevisions(null));
-  };
-
-  useEffect(load, []);
+  useEffect(() => {
+    if (!syllabusId) {
+      setDaily(null);
+      setWeekly(null);
+      setRevisions(null);
+      return;
+    }
+    getDailyGoal(syllabusId).then((g) => { setDaily(g); setDailyInput(String(g.target_questions)); }).catch(() => setDaily(null));
+    getWeeklyGoal(syllabusId).then((g) => { setWeekly(g); setWeeklyInput(String(g.target_topics)); }).catch(() => setWeekly(null));
+    getRevisionSchedule(syllabusId).then((r) => setRevisions(r.items)).catch(() => setRevisions(null));
+  }, [syllabusId]);
 
   const saveDaily = async () => {
+    if (!syllabusId) return;
     const n = Number(dailyInput);
     if (!Number.isFinite(n) || n < 1) return;
-    const g = await updateDailyGoal(Math.round(n)).catch(() => null);
+    const g = await updateDailyGoal(syllabusId, Math.round(n)).catch(() => null);
     if (g) setDaily(g);
     setEditingDaily(false);
   };
 
   const saveWeekly = async () => {
+    if (!syllabusId) return;
     const n = Number(weeklyInput);
     if (!Number.isFinite(n) || n < 1) return;
-    const g = await updateWeeklyGoal(Math.round(n)).catch(() => null);
+    const g = await updateWeeklyGoal(syllabusId, Math.round(n)).catch(() => null);
     if (g) setWeekly(g);
     setEditingWeekly(false);
   };
 
-  if (!daily && !weekly && !revisions) return null; // best-effort — plan page works without this
+  if (!syllabusId || (!daily && !weekly && !revisions)) return null; // best-effort — plan page works without this
 
   const dailyPct = daily ? Math.min(100, Math.round((daily.completed_questions / Math.max(1, daily.target_questions)) * 100)) : 0;
   const weeklyPct = weekly ? Math.min(100, Math.round((weekly.completed_topics / Math.max(1, weekly.target_topics)) * 100)) : 0;

@@ -1,29 +1,40 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   getStreakDays,
   getOrCreateDailyGoal,
   getOrCreateWeeklyGoal,
   getTopicMastery,
   getUpcomingRevisions,
+  syllabusBelongsToUser,
 } from "@/lib/db";
 import { withApiHandler } from "@/lib/apiHandler";
 
 const WEAK_TOPIC_LIMIT = 5;
 
-// ── GET /api/analytics/dashboard ─────────────────────────────────────────────
+// ── GET /api/analytics/dashboard?syllabus_id=... ────────────────────────────
 // Single combined read for the dashboard widgets — streak, today's/this
 // week's goal progress, weakest topics, and upcoming revisions — so the
-// dashboard page makes one request instead of five.
+// dashboard page makes one request instead of five. Every piece is scoped
+// to one syllabus so a freshly-uploaded notebook starts with a clean
+// dashboard instead of showing streaks/weak-topics/revisions left over
+// from a previous syllabus.
 export const GET = withApiHandler(
-  async (_req, ctx) => {
+  async (req: NextRequest, ctx) => {
     const userId = ctx.userId as string;
+    const syllabusId = req.nextUrl.searchParams.get("syllabus_id");
+    if (!syllabusId) {
+      return NextResponse.json({ detail: "syllabus_id is required." }, { status: 400 });
+    }
+    if (!(await syllabusBelongsToUser(syllabusId, userId))) {
+      return NextResponse.json({ detail: "Syllabus not found." }, { status: 404 });
+    }
 
     const [streakDays, dailyGoal, weeklyGoal, topics, revisions] = await Promise.all([
-      getStreakDays(userId),
-      getOrCreateDailyGoal(userId),
-      getOrCreateWeeklyGoal(userId),
-      getTopicMastery(userId),
-      getUpcomingRevisions(userId),
+      getStreakDays(userId, syllabusId),
+      getOrCreateDailyGoal(userId, syllabusId),
+      getOrCreateWeeklyGoal(userId, syllabusId),
+      getTopicMastery(userId, syllabusId),
+      getUpcomingRevisions(userId, syllabusId),
     ]);
 
     const totalAttempts = topics.reduce((a, t) => a + t.total_attempts, 0);

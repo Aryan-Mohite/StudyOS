@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import type { TopicMastery } from "@/types";
-import { getProgress, APIError } from "@/lib/api";
+import { getProgress, getLatestSyllabus, APIError } from "@/lib/api";
 import { LoadingSteps } from "@/components/LoadingSteps";
 import { ErrorState, EmptyState } from "@/components/StateComponents";
 
@@ -20,20 +20,35 @@ function masteryLabel(score: number): { label: string; icon: typeof TrendingUp }
 }
 
 export default function ProgressPage() {
+  const [syllabusId, setSyllabusId] = useState<string | null>(null);
+  const [syllabusLoading, setSyllabusLoading] = useState(true);
   const [topics, setTopics] = useState<TopicMastery[] | null>(null);
   const [overallAccuracy, setOverallAccuracy] = useState<number | null>(null);
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Progress is scoped to the current syllabus, so load it first — this is
+  // what keeps a freshly-uploaded notebook from showing mastery data left
+  // over from a previous one.
   useEffect(() => {
-    getProgress()
+    getLatestSyllabus()
+      .then((s) => setSyllabusId(s.syllabus_id))
+      .catch(() => setSyllabusId(null))
+      .finally(() => setSyllabusLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!syllabusId) return;
+    setTopics(null);
+    setError(null);
+    getProgress(syllabusId)
       .then((res) => {
         setTopics(res.topics);
         setOverallAccuracy(res.overall_accuracy);
         setTotalAttempts(res.total_attempts);
       })
       .catch((err) => setError(err instanceof APIError ? err.detail : "Could not load your progress."));
-  }, []);
+  }, [syllabusId]);
 
   // Group by subject for easier scanning.
   const bySubject = (topics ?? []).reduce<Record<string, TopicMastery[]>>((acc, t) => {
@@ -48,18 +63,31 @@ export default function ProgressPage() {
         <p className="mt-0.5 text-sm text-gray-500">Mastery per topic, based on your quiz attempts</p>
       </div>
 
-      {error && <ErrorState message={error} onRetry={() => window.location.reload()} />}
+      {syllabusLoading && <LoadingSteps currentStep="Loading your syllabus" completedSteps={[]} />}
 
-      {!error && !topics && <LoadingSteps currentStep="Loading your progress" completedSteps={[]} />}
+      {!syllabusLoading && !syllabusId && (
+        <EmptyState
+          message="No syllabus uploaded yet"
+          suggestion="Upload a syllabus PDF first, then come back to see your progress."
+        />
+      )}
 
-      {!error && topics && topics.length === 0 && (
+      {!syllabusLoading && syllabusId && error && (
+        <ErrorState message={error} onRetry={() => window.location.reload()} />
+      )}
+
+      {!syllabusLoading && syllabusId && !error && !topics && (
+        <LoadingSteps currentStep="Loading your progress" completedSteps={[]} />
+      )}
+
+      {!syllabusLoading && syllabusId && !error && topics && topics.length === 0 && (
         <EmptyState
           message="No attempts yet"
           suggestion="Take an MCQ quiz — your progress will show up here."
         />
       )}
 
-      {!error && topics && topics.length > 0 && (
+      {!syllabusLoading && syllabusId && !error && topics && topics.length > 0 && (
         <>
           <div className="mb-6 flex gap-3">
             <div className="flex-1 rounded-xl border border-border bg-surface p-4">

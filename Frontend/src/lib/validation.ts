@@ -70,17 +70,19 @@ export const attemptSubmitSchema = z.object({
   topic_id: topicId,
   topic_name: topicName,
   subject,
-  syllabus_id: z.string().max(64).nullable().optional(),
+  syllabus_id: syllabusId,
   content_type: z.literal("mcq"),
   difficulty: z.enum(["easy", "medium", "hard"]),
   is_correct: z.boolean(),
 });
 
 export const dailyGoalSchema = z.object({
+  syllabus_id: syllabusId,
   target_questions: z.number().int().min(1).max(200),
 });
 
 export const weeklyGoalSchema = z.object({
+  syllabus_id: syllabusId,
   target_topics: z.number().int().min(1).max(50),
 });
 

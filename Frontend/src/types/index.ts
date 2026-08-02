@@ -133,7 +133,7 @@ export interface AttemptSubmitInput {
   topic_id: string;
   topic_name: string;
   subject: string;
-  syllabus_id?: string;
+  syllabus_id: string;
   content_type: "mcq";
   difficulty: "easy" | "medium" | "hard";
   is_correct: boolean;

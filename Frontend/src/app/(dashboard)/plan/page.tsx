@@ -115,7 +115,7 @@ export default function PlanPage() {
         </p>
       </div>
 
-      <GoalsPanel />
+      <GoalsPanel syllabusId={syllabus?.syllabus_id} />
 
       {syllabusLoading ? (
         <LoadingSteps currentStep="Loading your syllabus" completedSteps={[]} />

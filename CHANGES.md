@@ -1,77 +1,114 @@
-# Fixes — Next.js Console/Runtime Errors (2026-07-31)
+# CHANGES.md — Multi-notebook isolation fix
 
-## 1. Hydration mismatch on `<body>` (Console Error, image 2/3)
+## The bug
 
-**Cause:** A browser extension (looks like Bitdefender TrafficLight / a similar
-security extension — signature is `bis_register` + `__processed_<uuid>`)
-injects attributes onto `<body>` before React hydrates. React sees those
-extra attributes on the client and flags a mismatch. `suppressHydrationWarning`
-was already set on `<html>` in `layout.tsx` but not on `<body>`, so the
-warning still fired for attributes injected on `<body>` itself.
+Uploading a new syllabus correctly showed its own topics, but the
+**Progress**, **Dashboard** (streak/weak-topics/revisions), and **Plan**
+(goals/revision queue) pages kept showing data from whichever syllabus the
+student had uploaded *previously*. Root cause: every read for that data
+filtered by `user_id` only — never `syllabus_id` — so a student with two
+syllabi shared one pool of mastery scores, streaks, goals, and revision
+items across both.
 
-**Fix:** `Frontend/src/app/layout.tsx` — added `suppressHydrationWarning` to
-the `<body>` tag as well. This only tells React to ignore mismatches on that
-one element's attributes; it does not disable hydration warnings anywhere
-else in the tree, so it's safe.
+Notes/MCQ content itself was **not** affected — topic IDs are random UUIDs
+generated fresh per syllabus parse, so per-topic content was already
+correctly isolated. The "notes of a previous syllabus" symptom was really
+the dashboard's weak-topics/revision widgets linking to `/study/:topicId`
+for topic IDs that no longer exist in the newly-uploaded syllabus.
 
-This is not a bug in your app — it'll still show up for users who have a
-similar extension installed, but it's cosmetic (dev-overlay-only) and this is
-the standard, documented way Next.js expects you to handle it.
+## Decision confirmed with Aryan
 
-## 2. Clerk `<SignIn/>` "not configured correctly" (Runtime Error, image 1/3)
+Daily/weekly goals and the study streak were, before this fix, tracked as
+one continuous counter per user (not per syllabus). Asked whether these
+should also reset per syllabus or stay as one cross-syllabus habit
+tracker — **confirmed: scope per syllabus**, same as progress/revisions.
 
-**Cause:** `sign-in/page.tsx` and `sign-up/page.tsx` were plain (non-catch-all)
-routes. Clerk's `<SignIn/>` / `<SignUp/>` components manage their own
-sub-navigation (e.g. `/sign-in/factor-one`, `/sign-in/sso-callback`) and
-require the page to be mounted on a catch-all route
-(`[[...rest]]`) to handle those internal steps. Your middleware itself was
-fine — `/sign-in` and `/sign-up` were correctly left out of
-`isProtectedRoute`, so cause #2 in the Clerk error message didn't apply here.
+## Schema changes (`Frontend/src/lib/db.ts`)
 
-**Fix:**
-- Moved `Frontend/src/app/(auth)/sign-in/page.tsx` →
-  `Frontend/src/app/(auth)/sign-in/[[...rest]]/page.tsx`
-- Moved `Frontend/src/app/(auth)/sign-up/page.tsx` →
-  `Frontend/src/app/(auth)/sign-up/[[...rest]]/page.tsx`
-- Component code inside each page is unchanged (still `path="/sign-in"` /
-  `path="/sign-up"`). All existing links (`Navbar.tsx`, `AppNavbar.tsx`,
-  `.env.local.example` Clerk URLs) already point at `/sign-in` and
-  `/sign-up`, and the catch-all route still matches those exact paths, so
-  nothing else needed to change.
+- `daily_goals` and `weekly_goals` gained a `syllabus_id` column and their
+  primary key changed from `(user_id, goal_date)` / `(user_id, week_start)`
+  to `(user_id, syllabus_id, goal_date)` / `(user_id, syllabus_id,
+  week_start)`.
+- **Migration note**: on an existing database, `migrateSchema()` detects
+  the old schema (no `syllabus_id` column) and drops + recreates these two
+  tables rather than migrating rows in place. Old rows can't be
+  retroactively attributed to a syllabus, and this project has no
+  production data yet (per prior sessions — not yet deployed), so a clean
+  rebuild was the simplest correct option. Flagging explicitly since it is
+  destructive to any local dev data in these two tables. `topic_mastery`
+  and `revision_schedule` were **not** schema-changed — their rows were
+  already uniquely tied to a syllabus via the topic's UUID `topic_id`,
+  they just weren't being *filtered* by it on read.
+- Added `syllabusBelongsToUser(syllabusId, userId)` — a reusable ownership
+  check now used by every route below, same pattern already used in
+  `/api/reference` and `/api/plan/generate`.
 
-### ⚠️ Manual step required
-Since this delivery only contains new/changed files, **you need to delete
-the old files yourself** after extracting this zip (git won't do it for you):
-```
-rm "Frontend/src/app/(auth)/sign-in/page.tsx"
-rm "Frontend/src/app/(auth)/sign-up/page.tsx"
-```
-If you leave the old `page.tsx` next to the new `[[...rest]]/page.tsx`,
-Next.js will throw a duplicate-route build error.
+## Functions re-scoped to `(userId, syllabusId)`
 
----
+`getTopicMastery`, `getUpcomingRevisions`, `getOrCreateDailyGoal`,
+`setDailyGoalTarget`, `getOrCreateWeeklyGoal`, `setWeeklyGoalTarget`,
+`getStreakDays`. `recordAttempt`'s `syllabusId` is now a required string
+(was optional/nullable) and is threaded into the `daily_goals` upsert too.
 
-## Verification performed
-- `tsc --noEmit` on the 3 touched files: **clean, zero errors**.
-- `next build`: webpack compilation of these routes succeeded (no errors
-  related to sign-in/sign-up/layout). Type-checking failed afterward, but
-  for a completely unrelated, pre-existing reason — see below.
+## API routes changed
 
-## ⚠️ Separate pre-existing issue found (not fixed, out of scope)
-While verifying the build, `next build` failed at the type-check stage
-because these files import functions that don't actually exist in their
-target modules:
-- `src/app/api/chat/route.ts` imports `tutorChat` from `@/lib/agentic`, and
-  `getCachedFaqAnswer`, `getNotebookIdForSyllabus`, `normalizeQuestion`,
-  `upsertFaqCache` from `@/lib/db` — none of these are exported.
-- `src/app/api/numericals/generate/route.ts` imports `generateNumericals`
-  from `@/lib/agentic` — not exported.
-- `ChatPanel.tsx` and `NumericalsView.tsx` similarly import missing members
-  from `@/types` and `@/lib/api`.
+- `GET /api/progress` — now requires `?syllabus_id=`, verifies ownership.
+- `GET /api/analytics/dashboard` — now requires `?syllabus_id=`, verifies
+  ownership, scopes streak/goals/weak-topics/revisions.
+- `GET /api/revision` — now requires `?syllabus_id=`, verifies ownership.
+- `GET`/`POST /api/goals/daily` and `/api/goals/weekly` — now require
+  `syllabus_id` (query param on GET, body field on POST via
+  `dailyGoalSchema`/`weeklyGoalSchema`), verify ownership.
+- `POST /api/attempts/submit` — `syllabus_id` is now required (was
+  optional/nullable) in `attemptSubmitSchema`, and ownership is verified
+  before the attempt is recorded (previously any string could be passed
+  through untrusted).
 
-This means `npm run build` currently fails regardless of the two fixes
-above — it's a naming/export mismatch, most likely from the Week 5 RAG/chat
-work where the route handlers were written against a planned API surface
-that either got renamed in `lib/agentic.ts`/`lib/db.ts` or never got added.
-Flagging this now since it'll block a production build; happy to fix it in
-a follow-up once you confirm the intended function names.
+## Frontend changes
+
+- `lib/api.ts` — `getProgress`, `getDailyGoal`, `updateDailyGoal`,
+  `getWeeklyGoal`, `updateWeeklyGoal`, `getRevisionSchedule`,
+  `getDashboardAnalytics` all now take a required `syllabusId` param.
+- `types/index.ts` — `AttemptSubmitInput.syllabus_id` is now required
+  (`string`, was `string | undefined`).
+- `progress/page.tsx` — rewritten to load the current syllabus first
+  (same pattern as `plan/page.tsx`), then fetch progress scoped to it;
+  shows "No syllabus uploaded yet" if none exists.
+- `dashboard/page.tsx` — passes `syllabusId={syllabus.syllabus_id}` into
+  `<DashboardAnalyticsPanel>`.
+- `components/DashboardAnalytics.tsx` — now takes a required `syllabusId`
+  prop, included in the fetch effect's dependency array so switching
+  syllabi refetches.
+- `plan/page.tsx` — passes `syllabusId={syllabus?.syllabus_id}` into
+  `<GoalsPanel>`.
+- `components/GoalsPanel.tsx` — now takes an optional `syllabusId` prop;
+  renders nothing until it's known (same "best-effort widget" pattern it
+  already used), refetches when it changes.
+- `components/MCQQuiz.tsx` — attempt submission is now guarded on
+  `syllabusId` being present (it always will be in practice, since the
+  study page waits on the syllabus before rendering this component at
+  all, but this avoids a malformed request in the edge case).
+
+## Verification
+
+- `tsc --noEmit` — clean, no errors.
+- `npm run build` — webpack compile, lint, and type-check all passed.
+  Static prerendering of `/_not-found` fails only because this sandbox
+  has a placeholder Clerk key (`pk_test_your-key-here` from
+  `.env.local.example`), not because of anything in this change — you'll
+  see this resolve with real Clerk credentials.
+- No AgenticService (Python) changes were needed — this was purely a
+  MySQL query-scoping issue in the Next.js layer.
+
+## Not in scope / flagged for later
+
+- `getSuggestedDifficulty` (topic_mastery lookup by `topic_id` alone) was
+  left as-is — `topic_id` is already a syllabus-unique UUID, so no
+  cross-syllabus leak is possible there, adding `syllabus_id` would be
+  redundant.
+- `/api/notes/[topicId]` and `/api/mcq/[topicId]` (GET/DELETE) still don't
+  check that the requesting user owns the syllabus that topic belongs to
+  — low practical risk since `topic_id` is an unguessable UUID, but it's
+  the same category of gap `/api/reference` used to have before it added
+  an ownership check. Worth a follow-up pass if you want defense in depth
+  there too.

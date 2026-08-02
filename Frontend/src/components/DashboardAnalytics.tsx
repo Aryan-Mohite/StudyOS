@@ -5,21 +5,27 @@ import { Flame, Target, AlertCircle, RotateCw, ArrowRight } from "lucide-react";
 import type { DashboardAnalytics } from "@/types";
 import { getDashboardAnalytics } from "@/lib/api";
 
+interface DashboardAnalyticsPanelProps {
+  /** Scopes streak/goals/weak-topics/revisions to one syllabus so a freshly-uploaded notebook doesn't show a previous syllabus's numbers. */
+  syllabusId: string;
+}
+
 /**
  * Client-fetched so it doesn't block the dashboard's server-rendered
  * syllabus content, and so a brand-new user (no attempts yet) just sees
  * empty-friendly zeros rather than the whole page failing.
  */
-export function DashboardAnalyticsPanel() {
+export function DashboardAnalyticsPanel({ syllabusId }: DashboardAnalyticsPanelProps) {
   const [data, setData] = useState<DashboardAnalytics | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    getDashboardAnalytics()
+    setLoaded(false);
+    getDashboardAnalytics(syllabusId)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoaded(true));
-  }, []);
+  }, [syllabusId]);
 
   if (!loaded) {
     return <div className="mb-6 h-24 animate-pulse rounded-xl border border-border bg-surface" />;
