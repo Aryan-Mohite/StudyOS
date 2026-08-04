@@ -109,8 +109,9 @@ will block every request from your Vercel frontend to the Render backend.
    Aiven MySQL, the full chain.
 3. Upload a reference material PDF for that syllabus — this exercises the
    Qdrant write path.
-4. Ask the AI tutor something that should draw on that reference material —
-   exercises the Qdrant read path.
+4. Generate Notes or an MCQ set for a topic covered by that reference
+   material — exercises the Qdrant read path (check `grounded_in_reference`
+   in the response).
 5. If the first request after some idle time takes 30-60 seconds, that's
    the Render free-tier cold start, not a failure — see below.
 

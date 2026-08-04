@@ -16,6 +16,22 @@ const DIFFICULTY_STYLE: Record<string, string> = {
   hard: "text-red-600 bg-red-50 border-red-200",
 };
 
+const DIFFICULTY_CHOICES: { value: SuggestedDifficulty; label: string }[] = [
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
+  { value: "mixed", label: "Mixed" },
+];
+
+// Selected-state styling per difficulty — mirrors DIFFICULTY_STYLE's palette
+// so the picker and the in-quiz badge read as the same visual language.
+const DIFFICULTY_SELECTED_STYLE: Record<SuggestedDifficulty, string> = {
+  easy: "border-emerald-400 bg-emerald-50 text-emerald-700",
+  medium: "border-amber-400 bg-amber-50 text-amber-700",
+  hard: "border-red-400 bg-red-50 text-red-700",
+  mixed: "border-brand-400 bg-brand-50 text-brand-700",
+};
+
 interface MCQQuizProps {
   topicId: string;
   topicName: string;
@@ -34,6 +50,12 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [wasCached, setWasCached] = useState(false);
   const [suggested, setSuggested] = useState<SuggestedDifficulty | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<SuggestedDifficulty>("mixed");
+  // Tracks the difficulty actually sent on the last successful generate, so
+  // switching the picker to a different value forces a fresh request instead
+  // of silently returning a cached set built at the old difficulty (the
+  // cache below is keyed on topic_id only, not difficulty).
+  const [lastGeneratedDifficulty, setLastGeneratedDifficulty] = useState<SuggestedDifficulty | null>(null);
 
   // Fetch a difficulty suggestion based on the student's own accuracy on this
   // topic — shown as a hint only; they still tap "Start Quiz" themselves and
@@ -45,7 +67,13 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
   }, [topicId]);
 
   const generate = async (forceRegenerate = false) => {
-    setStatus(forceRegenerate ? "regenerating" : "loading");
+    // A different difficulty than what's cached must bypass the cache too,
+    // or the student taps "Hard" and silently gets back the old "Mixed" set.
+    const difficultyChanged =
+      lastGeneratedDifficulty !== null && lastGeneratedDifficulty !== selectedDifficulty;
+    const effectiveForce = forceRegenerate || difficultyChanged;
+
+    setStatus(effectiveForce ? "regenerating" : "loading");
     setCompletedSteps([]);
     setCurrentIndex(0);
     setAnswers({});
@@ -63,20 +91,27 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
     }, 4000);
 
     try {
+      if (difficultyChanged) {
+        // Same belt-and-suspenders pattern as handleRegenerate: clear the
+        // cached row before asking for a fresh one at the new difficulty.
+        try { await deleteMCQ(topicId); } catch { /* ignore if not cached */ }
+      }
+
       const result = await generateMCQ({
         topic_id: topicId,
         topic_name: topicName,
         subject,
         count: 10,
-        difficulty: "mixed",
+        difficulty: selectedDifficulty,
         syllabus_context: syllabusContext,
         syllabus_id: syllabusId,
-        force_regenerate: forceRegenerate,
+        force_regenerate: effectiveForce,
       });
 
       clearInterval(ticker);
       setWasCached(result._cached ?? false);
       setData(result);
+      setLastGeneratedDifficulty(selectedDifficulty);
       setStatus("in_progress");
     } catch (err) {
       clearInterval(ticker);
@@ -139,20 +174,51 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
   };
 
   if (status === "idle") {
+    const pickedDescription =
+      selectedDifficulty === "mixed"
+        ? "10 questions, mix of easy, medium, and hard."
+        : `10 ${selectedDifficulty} questions.`;
+
     return (
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {DIFFICULTY_CHOICES.map(({ value, label }) => {
+            const isSelected = selectedDifficulty === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSelectedDifficulty(value)}
+                aria-pressed={isSelected}
+                className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors ${
+                  isSelected
+                    ? DIFFICULTY_SELECTED_STYLE[value]
+                    : "border-border bg-surface text-gray-500 hover:border-brand-200 hover:text-brand-600"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
         <IdleGenerateCard
           label="Start Quiz"
-          description={`${topicName} — 10 questions, mix of easy, medium, and hard.`}
+          description={`${topicName} — ${pickedDescription}`}
           estimatedTime="~15–25 seconds"
           onGenerate={() => generate()}
           icon={<HelpCircle size={22} />}
         />
-        {suggested && (
-          <span className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-medium text-brand-600">
+
+        {suggested && selectedDifficulty !== suggested && (
+          <button
+            type="button"
+            onClick={() => setSelectedDifficulty(suggested)}
+            className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-[11px] font-medium text-brand-600 transition-colors hover:border-brand-300 hover:bg-brand-100"
+          >
             <TrendingUp size={11} />
-            Based on your past attempts, you might be ready for {suggested} questions
-          </span>
+            Based on your past attempts, you might be ready for {suggested} — tap to use it
+          </button>
         )}
       </div>
     );
