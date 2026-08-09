@@ -37,9 +37,9 @@ interface SyllabusSummary {
 
 const SESSION_STYLES: Record<PlanDay["session_type"], string> = {
   learn: "border-border bg-surface",
-  revision: "border-brand-200 bg-brand-50",
-  mock_test: "border-amber-200 bg-amber-50",
-  rest: "border-border bg-gray-50",
+  revision: "border-brand-200 dark:border-brand-500/30 bg-brand-50 dark:bg-brand-500/10",
+  mock_test: "border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10",
+  rest: "border-border bg-muted",
 };
 
 const SESSION_LABELS: Record<PlanDay["session_type"], string> = {
@@ -109,8 +109,8 @@ export default function PlanPage() {
   return (
     <div className="mx-auto max-w-3xl px-5 py-8">
       <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold text-gray-900">Study Plan</h1>
-        <p className="mt-0.5 text-sm text-gray-500">
+        <h1 className="font-display text-2xl font-bold text-ink">Study Plan</h1>
+        <p className="mt-0.5 text-sm text-ink-2">
           Day-by-day scheduling based on your syllabus
         </p>
       </div>
@@ -129,7 +129,7 @@ export default function PlanPage() {
           {/* Exam date picker */}
           <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <label htmlFor="exam-date" className="text-xs font-semibold text-gray-500">
+              <label htmlFor="exam-date" className="text-xs font-semibold text-ink-2">
                 Exam date
               </label>
               <input
@@ -138,7 +138,7 @@ export default function PlanPage() {
                 min={todayStr}
                 value={examDate}
                 onChange={(e) => setExamDate(e.target.value)}
-                className="mt-1 block rounded-lg border border-border bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-400 focus:outline-none"
+                className="mt-1 block rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-brand-400 dark:border-brand-500/50 focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
               />
             </div>
             <Button
@@ -181,7 +181,7 @@ export default function PlanPage() {
           {status === "idle" && plan && (
             <div>
               <div className="mb-4 flex items-center justify-between">
-                <p className="text-xs font-medium text-gray-500">
+                <p className="text-xs font-medium text-ink-2">
                   {plan.total_days} day{plan.total_days === 1 ? "" : "s"} until {plan.exam_date}
                   {plan._cached ? " · cached" : ""}
                 </p>
@@ -193,10 +193,10 @@ export default function PlanPage() {
                     className={`rounded-xl border p-4 ${SESSION_STYLES[day.session_type]}`}
                   >
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-800">
+                      <span className="text-sm font-semibold text-ink">
                         Day {day.day_number}
                       </span>
-                      <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+                      <span className="rounded-full bg-surface/70 px-2 py-0.5 text-[11px] font-semibold text-ink-2">
                         {SESSION_LABELS[day.session_type]}
                       </span>
                     </div>
@@ -205,21 +205,21 @@ export default function PlanPage() {
                         {day.topics.map((t) => (
                           <li
                             key={t.topic_id}
-                            className="flex items-center gap-2 text-sm text-gray-700"
+                            className="flex items-center gap-2 text-sm text-ink"
                           >
                             <ListChecks size={13} className="shrink-0 text-brand-400" />
                             <span>
                               {t.topic_name}{" "}
-                              <span className="text-gray-400">· {t.subject}</span>
+                              <span className="text-ink-3">· {t.subject}</span>
                             </span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-gray-400">No new topics — revisit earlier material.</p>
+                      <p className="text-sm text-ink-3">No new topics — revisit earlier material.</p>
                     )}
                     {day.focus_note && (
-                      <p className="mt-2 text-xs italic text-gray-400">{day.focus_note}</p>
+                      <p className="mt-2 text-xs italic text-ink-3">{day.focus_note}</p>
                     )}
                   </div>
                 ))}

@@ -29,14 +29,14 @@ export default async function DashboardPage() {
   if (!syllabus) {
     return (
       <div className="mx-auto flex max-w-xl flex-col items-center gap-5 px-5 py-24 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/10">
           <FileUp size={26} className="text-brand-500" />
         </div>
         <div>
-          <h1 className="font-display text-xl font-bold text-gray-900">
+          <h1 className="font-display text-xl font-bold text-ink">
             No syllabus yet
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-ink-2">
             Upload your university syllabus PDF and StudyOS will turn it into
             structured notes, MCQs, and a day-by-day study plan.
           </p>
@@ -56,12 +56,23 @@ export default async function DashboardPage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-screen-xl gap-0 px-5 py-6">
-      {/* Left: Syllabus tree */}
-      <aside className="w-64 shrink-0 pr-6">
+    <div className="mx-auto flex max-w-screen-xl flex-col px-4 py-6 sm:px-5 lg:flex-row lg:gap-0">
+      {/* Mobile/tablet: collapsible syllabus tree (native <details>, no JS needed) */}
+      <details className="mb-4 rounded-xl border border-border bg-surface lg:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-[12px] font-bold uppercase tracking-widest text-ink-3">
+          <span>Your Syllabus</span>
+          <span className="text-[11px] text-brand-500 font-medium">Tap to view</span>
+        </summary>
+        <div className="border-t border-border p-4">
+          <SyllabusTree syllabus={syllabus} />
+        </div>
+      </details>
+
+      {/* Desktop: fixed sidebar */}
+      <aside className="hidden shrink-0 pr-6 lg:block lg:w-64">
         <div className="sticky top-[60px] rounded-xl border border-border bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-[12px] font-bold uppercase tracking-widest text-gray-400">Your Syllabus</h2>
+            <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-3">Your Syllabus</h2>
             <Link href="/upload" className="text-[11px] text-brand-500 hover:text-brand-700 font-medium">Replace</Link>
           </div>
           <SyllabusTree syllabus={syllabus} />
@@ -69,10 +80,10 @@ export default async function DashboardPage() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0">
+      <main className="min-w-0 flex-1">
         <div className="mb-6">
-          <h1 className="font-display text-2xl font-bold text-gray-900">Good morning, Student 👋</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="font-display text-2xl font-bold text-ink">Good morning, Student 👋</h1>
+          <p className="mt-1 text-sm text-ink-2">
             {syllabus.university} · Semester {syllabus.semester} · {syllabus.subjects.length} subjects
           </p>
         </div>
@@ -81,52 +92,52 @@ export default async function DashboardPage() {
         <DashboardAnalyticsPanel syllabusId={syllabus.syllabus_id} />
 
         {/* Quick stats */}
-        <div className="mb-6 grid grid-cols-2 gap-3">
+        <div className="mb-6 grid grid-cols-1 gap-3 xs:grid-cols-2">
           {[
             { label: "Total Topics", value: totalTopics, sub: "across all subjects" },
             { label: "Subjects", value: syllabus.subjects.length, sub: syllabus.university },
           ].map((stat) => (
             <div key={stat.label} className="rounded-xl border border-border bg-surface p-4">
               <p className="font-display text-2xl font-bold text-brand-500">{stat.value}</p>
-              <p className="mt-0.5 text-[13px] font-medium text-gray-700">{stat.label}</p>
-              <p className="text-[11px] text-gray-400">{stat.sub}</p>
+              <p className="mt-0.5 text-[13px] font-medium text-ink">{stat.label}</p>
+              <p className="text-[11px] text-ink-3">{stat.sub}</p>
             </div>
           ))}
         </div>
 
         {/* Quick actions */}
-        <div className="mb-6 grid grid-cols-2 gap-3">
-          <Link href="/plan" className="group rounded-xl border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:shadow-md hover:shadow-brand-500/10 hover:border-brand-300">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50">
+        <div className="mb-6 grid grid-cols-1 gap-3 xs:grid-cols-2">
+          <Link href="/plan" className="group rounded-xl border border-border bg-surface p-5 transition-all hover:-translate-y-0.5 hover:shadow-md hover:shadow-brand-500/10 hover:border-brand-300 dark:border-brand-500/40">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/10">
               <Calendar size={18} className="text-brand-500" />
             </div>
-            <h3 className="text-[14px] font-semibold text-gray-900">Study Plan</h3>
-            <p className="mt-1 text-[12px] text-gray-500">Generate a day-by-day schedule</p>
+            <h3 className="text-[14px] font-semibold text-ink">Study Plan</h3>
+            <p className="mt-1 text-[12px] text-ink-2">Generate a day-by-day schedule</p>
             <span className="mt-3 flex items-center gap-1 text-[12px] font-medium text-brand-500 group-hover:gap-2 transition-all">
               Open plan <ArrowRight size={12} />
             </span>
           </Link>
-          <Link href="/upload" className="group rounded-xl border border-dashed border-border bg-page p-5 transition-all hover:border-brand-300 hover:bg-brand-50/30">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100">
-              <Upload size={18} className="text-gray-500" />
+          <Link href="/upload" className="group rounded-xl border border-dashed border-border bg-page p-5 transition-all hover:border-brand-300 dark:border-brand-500/40 hover:bg-brand-50/30">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
+              <Upload size={18} className="text-ink-2" />
             </div>
-            <h3 className="text-[14px] font-semibold text-gray-700">Upload New Syllabus</h3>
-            <p className="mt-1 text-[12px] text-gray-400">Replace or add another subject</p>
+            <h3 className="text-[14px] font-semibold text-ink">Upload New Syllabus</h3>
+            <p className="mt-1 text-[12px] text-ink-3">Replace or add another subject</p>
           </Link>
         </div>
 
         {/* Subject cards */}
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-display text-[16px] font-semibold text-gray-900">Subjects</h2>
-          <span className="text-[12px] text-gray-400">Click any topic to start studying</span>
+          <h2 className="font-display text-[16px] font-semibold text-ink">Subjects</h2>
+          <span className="text-[12px] text-ink-3">Click any topic to start studying</span>
         </div>
         <div className="flex flex-col gap-3">
           {syllabus.subjects.map((subject: SyllabusSubject, si: number) => {
             const icons = [BookOpen, Beaker];
             const IconComp = icons[si % icons.length];
             const colorSets = [
-              { icon: "text-brand-500", iconBg: "bg-brand-50", border: "border-brand-200", headerBg: "bg-brand-50" },
-              { icon: "text-rose-500",  iconBg: "bg-rose-50",  border: "border-rose-200",  headerBg: "bg-rose-50"  },
+              { icon: "text-brand-500", iconBg: "bg-brand-50 dark:bg-brand-500/10", border: "border-brand-200 dark:border-brand-500/30", headerBg: "bg-brand-50 dark:bg-brand-500/10" },
+              { icon: "text-rose-500",  iconBg: "bg-rose-50 dark:bg-rose-500/10",  border: "border-rose-200 dark:border-rose-500/30",  headerBg: "bg-rose-50 dark:bg-rose-500/10"  },
             ];
             const colors = colorSets[si % colorSets.length];
             const topicCount = subject.units.reduce((a: number, u) => a + u.topics.length, 0);
@@ -138,8 +149,8 @@ export default async function DashboardPage() {
                     <IconComp size={17} className={colors.icon} />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-display text-[15px] font-bold text-gray-900">{subject.name}</h3>
-                    <p className="text-[12px] text-gray-500">{subject.code} · {subject.units.length} units · {topicCount} topics</p>
+                    <h3 className="font-display text-[15px] font-bold text-ink">{subject.name}</h3>
+                    <p className="text-[12px] text-ink-2">{subject.code} · {subject.units.length} units · {topicCount} topics</p>
                   </div>
                   {(() => {
                     const firstTopic = subject.units.flatMap((u) => u.topics)[0];
@@ -155,14 +166,14 @@ export default async function DashboardPage() {
                 <div className="flex flex-wrap gap-2 bg-surface px-5 py-4">
                   {subject.units.flatMap((u) => u.topics).slice(0, 8).map((topic) => (
                     <Link key={topic.topic_id} href={`/study/${topic.topic_id}`}>
-                      <span className="cursor-pointer rounded-full border border-border bg-page px-3 py-1 text-[12px] text-gray-600 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                      <span className="cursor-pointer rounded-full border border-border bg-page px-3 py-1 text-[12px] text-ink-2 hover:border-brand-300 dark:border-brand-500/40 hover:text-brand-600 transition-colors">
                         {topic.name}
                       </span>
                     </Link>
                   ))}
                   {topicCount > 8 && subject.units.flatMap((u) => u.topics)[8] && (
                     <Link href={`/study/${subject.units.flatMap((u) => u.topics)[8].topic_id}`}>
-                      <span className="cursor-pointer rounded-full border border-border bg-page px-3 py-1 text-[12px] text-gray-400 hover:border-brand-300 hover:text-brand-600 transition-colors">
+                      <span className="cursor-pointer rounded-full border border-border bg-page px-3 py-1 text-[12px] text-ink-3 hover:border-brand-300 dark:border-brand-500/40 hover:text-brand-600 transition-colors">
                         +{topicCount - 8} more
                       </span>
                     </Link>

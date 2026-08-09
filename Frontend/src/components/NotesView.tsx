@@ -137,18 +137,18 @@ export function NotesView({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="font-display text-lg font-bold text-gray-900">{data.topic}</h2>
+          <h2 className="font-display text-lg font-bold text-ink">{data.topic}</h2>
           <div className="mt-1 flex items-center gap-2">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-ink-3">
               {data.subject} · Generated {new Date(data.generated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
             </p>
             {wasCached && (
-              <span className="flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+              <span className="flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
                 <Zap size={9} /> Instant (cached)
               </span>
             )}
             {!wasCached && (
-              <span className="rounded-full bg-brand-50 border border-brand-200 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
+              <span className="rounded-full bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/30 px-2 py-0.5 text-[10px] font-semibold text-brand-600">
                 Live · StudyOS
               </span>
             )}
@@ -166,19 +166,19 @@ export function NotesView({
       <div className="flex flex-col gap-5">
         {data.sections.map((section, i) => (
           <div key={i} className="rounded-xl border border-border bg-surface p-5">
-            <h3 className="mb-3 font-display text-[15px] font-semibold text-gray-900">
+            <h3 className="mb-3 font-display text-[15px] font-semibold text-ink">
               {section.heading}
             </h3>
-            <div className="prose prose-sm max-w-none text-gray-600 leading-relaxed text-[14px] whitespace-pre-wrap">
+            <div className="prose prose-sm max-w-none text-ink-2 leading-relaxed text-[14px] whitespace-pre-wrap">
               {section.content}
             </div>
             {section.formula && <FormulaBlock formula={section.formula} />}
             {section.key_points.length > 0 && (
               <div className="mt-4 rounded-lg bg-page p-3">
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Key Points</p>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-3">Key Points</p>
                 <ul className="flex flex-col gap-1.5">
                   {section.key_points.map((pt, j) => (
-                    <li key={j} className="flex items-start gap-2 text-[13px] text-gray-600">
+                    <li key={j} className="flex items-start gap-2 text-[13px] text-ink-2">
                       <ChevronRight size={13} className="mt-0.5 shrink-0 text-brand-400" />
                       {pt}
                     </li>
@@ -191,7 +191,7 @@ export function NotesView({
       </div>
 
       {/* Summary */}
-      <div className="rounded-xl border border-brand-200 bg-brand-50 p-5">
+      <div className="rounded-xl border border-brand-200 dark:border-brand-500/30 bg-brand-50 dark:bg-brand-500/10 p-5">
         <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-brand-400">Summary</p>
         <p className="text-[14px] leading-relaxed text-brand-800">{data.summary}</p>
       </div>
@@ -199,10 +199,10 @@ export function NotesView({
       {/* Related topics */}
       {data.related_topics.length > 0 && (
         <div>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400">Related Topics</p>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-3">Related Topics</p>
           <div className="flex flex-wrap gap-2">
             {data.related_topics.map((t) => (
-              <span key={t} className="rounded-full border border-border bg-page px-3 py-1 text-xs font-medium text-gray-600 hover:border-brand-300 hover:text-brand-600 transition-colors cursor-pointer">
+              <span key={t} className="rounded-full border border-border bg-page px-3 py-1 text-xs font-medium text-ink-2 hover:border-brand-300 dark:border-brand-500/40 hover:text-brand-600 transition-colors cursor-pointer">
                 {t}
               </span>
             ))}

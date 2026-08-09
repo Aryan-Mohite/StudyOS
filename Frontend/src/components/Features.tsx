@@ -21,10 +21,10 @@ export function Features() {
           <span className="mb-3 inline-block text-xs font-bold uppercase tracking-widest text-brand-500">
             What you get
           </span>
-          <h2 className="font-display text-[30px] font-bold tracking-tight text-gray-900">
+          <h2 className="font-display text-[30px] font-bold tracking-tight text-ink">
             Everything a student needs.
           </h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-gray-500">
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
             Upload your syllabus once. StudyOS builds a complete learning environment
             — no manual searching across YouTube, PDFs, or question banks.
           </p>
@@ -45,8 +45,8 @@ export function Features() {
                   <div style={{ background: f.bg }} className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl">
                     <f.icon size={19} style={{ color: f.color }} />
                   </div>
-                  <h3 className="mb-1.5 text-[14px] font-semibold text-gray-900">{f.title}</h3>
-                  <p className="text-[13px] leading-relaxed text-gray-500">{f.desc}</p>
+                  <h3 className="mb-1.5 text-[14px] font-semibold text-ink">{f.title}</h3>
+                  <p className="text-[13px] leading-relaxed text-ink-2">{f.desc}</p>
                 </CardContent>
               </Card>
             </motion.div>

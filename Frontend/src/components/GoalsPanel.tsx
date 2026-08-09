@@ -61,11 +61,11 @@ export function GoalsPanel({ syllabusId }: GoalsPanelProps) {
       {daily && (
         <div className="rounded-xl border border-border bg-surface p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500">
+            <h3 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-ink-2">
               <Target size={12} /> Daily goal
             </h3>
             {!editingDaily && (
-              <button onClick={() => setEditingDaily(true)} className="text-gray-400 hover:text-brand-500">
+              <button onClick={() => setEditingDaily(true)} aria-label="Edit daily goal" className="text-ink-3 hover:text-brand-500">
                 <Pencil size={12} />
               </button>
             )}
@@ -80,12 +80,12 @@ export function GoalsPanel({ syllabusId }: GoalsPanelProps) {
                 onChange={(e) => setDailyInput(e.target.value)}
                 className="w-20 rounded-lg border border-border px-2 py-1 text-sm"
               />
-              <span className="text-[12px] text-gray-500">questions/day</span>
+              <span className="text-[12px] text-ink-2">questions/day</span>
               <button onClick={saveDaily} className="ml-auto text-[12px] font-semibold text-brand-500 hover:text-brand-700">Save</button>
             </div>
           ) : (
             <>
-              <p className="font-display text-lg font-bold text-gray-900">
+              <p className="font-display text-lg font-bold text-ink">
                 {daily.completed_questions} / {daily.target_questions} questions
               </p>
               <div className="mt-2 h-1.5 w-full rounded-full bg-border">
@@ -100,11 +100,11 @@ export function GoalsPanel({ syllabusId }: GoalsPanelProps) {
       {weekly && (
         <div className="rounded-xl border border-border bg-surface p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500">
+            <h3 className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-ink-2">
               <CalendarCheck size={12} /> Weekly goal
             </h3>
             {!editingWeekly && (
-              <button onClick={() => setEditingWeekly(true)} className="text-gray-400 hover:text-brand-500">
+              <button onClick={() => setEditingWeekly(true)} aria-label="Edit weekly goal" className="text-ink-3 hover:text-brand-500">
                 <Pencil size={12} />
               </button>
             )}
@@ -119,12 +119,12 @@ export function GoalsPanel({ syllabusId }: GoalsPanelProps) {
                 onChange={(e) => setWeeklyInput(e.target.value)}
                 className="w-20 rounded-lg border border-border px-2 py-1 text-sm"
               />
-              <span className="text-[12px] text-gray-500">topics/week</span>
+              <span className="text-[12px] text-ink-2">topics/week</span>
               <button onClick={saveWeekly} className="ml-auto text-[12px] font-semibold text-brand-500 hover:text-brand-700">Save</button>
             </div>
           ) : (
             <>
-              <p className="font-display text-lg font-bold text-gray-900">
+              <p className="font-display text-lg font-bold text-ink">
                 {weekly.completed_topics} / {weekly.target_topics} topics
               </p>
               <div className="mt-2 h-1.5 w-full rounded-full bg-border">
@@ -138,16 +138,16 @@ export function GoalsPanel({ syllabusId }: GoalsPanelProps) {
       {/* Revision schedule */}
       {revisions && revisions.length > 0 && (
         <div className="col-span-full rounded-xl border border-border bg-surface p-4">
-          <h3 className="mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-gray-500">
+          <h3 className="mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-ink-2">
             <RotateCw size={12} /> Revision schedule
           </h3>
           <ul className="flex flex-col gap-1.5">
             {revisions.map((r) => (
               <li key={r.topic_id} className="flex items-center justify-between text-[13px]">
-                <Link href={`/study/${r.topic_id}`} className="text-gray-700 hover:text-brand-600">
-                  {r.topic_name} <span className="text-gray-400">· {r.subject}</span>
+                <Link href={`/study/${r.topic_id}`} className="text-ink hover:text-brand-600">
+                  {r.topic_name} <span className="text-ink-3">· {r.subject}</span>
                 </Link>
-                <span className={`text-[11px] font-semibold ${r.overdue ? "text-red-500" : "text-gray-400"}`}>
+                <span className={`text-[11px] font-semibold ${r.overdue ? "text-red-500" : "text-ink-3"}`}>
                   {r.overdue ? "Overdue" : r.next_review_date}
                 </span>
               </li>

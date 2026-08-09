@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +21,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <body className="min-h-screen bg-page font-sans antialiased" suppressHydrationWarning>
-          {children}
+          <ThemeProvider>
+            <a href="#main-content" className="skip-link">
+              Skip to main content
+            </a>
+            {children}
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

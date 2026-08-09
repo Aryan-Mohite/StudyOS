@@ -59,8 +59,8 @@ export default function ProgressPage() {
   return (
     <div className="mx-auto max-w-3xl px-5 py-8">
       <div className="mb-6">
-        <h1 className="font-display text-2xl font-bold text-gray-900">Your Progress</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Mastery per topic, based on your quiz attempts</p>
+        <h1 className="font-display text-2xl font-bold text-ink">Your Progress</h1>
+        <p className="mt-0.5 text-sm text-ink-2">Mastery per topic, based on your quiz attempts</p>
       </div>
 
       {syllabusLoading && <LoadingSteps currentStep="Loading your syllabus" completedSteps={[]} />}
@@ -89,27 +89,27 @@ export default function ProgressPage() {
 
       {!syllabusLoading && syllabusId && !error && topics && topics.length > 0 && (
         <>
-          <div className="mb-6 flex gap-3">
-            <div className="flex-1 rounded-xl border border-border bg-surface p-4">
+          <div className="mb-6 grid grid-cols-1 gap-3 xs:grid-cols-3">
+            <div className="rounded-xl border border-border bg-surface p-4">
               <p className="font-display text-2xl font-bold text-brand-500">
                 {overallAccuracy !== null ? `${overallAccuracy}%` : "—"}
               </p>
-              <p className="text-[13px] font-medium text-gray-700">Overall accuracy</p>
+              <p className="text-[13px] font-medium text-ink">Overall accuracy</p>
             </div>
-            <div className="flex-1 rounded-xl border border-border bg-surface p-4">
+            <div className="rounded-xl border border-border bg-surface p-4">
               <p className="font-display text-2xl font-bold text-brand-500">{totalAttempts}</p>
-              <p className="text-[13px] font-medium text-gray-700">Questions answered</p>
+              <p className="text-[13px] font-medium text-ink">Questions answered</p>
             </div>
-            <div className="flex-1 rounded-xl border border-border bg-surface p-4">
+            <div className="rounded-xl border border-border bg-surface p-4">
               <p className="font-display text-2xl font-bold text-brand-500">{topics.length}</p>
-              <p className="text-[13px] font-medium text-gray-700">Topics practiced</p>
+              <p className="text-[13px] font-medium text-ink">Topics practiced</p>
             </div>
           </div>
 
           <div className="flex flex-col gap-6">
             {Object.entries(bySubject).map(([subject, subjectTopics]) => (
               <div key={subject}>
-                <h2 className="mb-2 font-display text-[15px] font-bold text-gray-900">{subject}</h2>
+                <h2 className="mb-2 font-display text-[15px] font-bold text-ink">{subject}</h2>
                 <div className="flex flex-col gap-2">
                   {subjectTopics.map((t) => {
                     const { label, icon: Icon } = masteryLabel(t.mastery_score);
@@ -117,11 +117,11 @@ export default function ProgressPage() {
                       <Link
                         key={t.topic_id}
                         href={`/study/${t.topic_id}`}
-                        className="rounded-xl border border-border bg-surface p-3.5 hover:border-brand-300 transition-colors"
+                        className="rounded-xl border border-border bg-surface p-3.5 hover:border-brand-300 dark:border-brand-500/40 transition-colors"
                       >
                         <div className="mb-1.5 flex items-center justify-between">
-                          <span className="text-[13px] font-medium text-gray-800">{t.topic_name}</span>
-                          <span className="flex items-center gap-1 text-[11px] font-semibold text-gray-500">
+                          <span className="text-[13px] font-medium text-ink">{t.topic_name}</span>
+                          <span className="flex items-center gap-1 text-[11px] font-semibold text-ink-2">
                             <Icon size={11} /> {label} · {Math.round(t.mastery_score)}%
                           </span>
                         </div>
@@ -131,7 +131,7 @@ export default function ProgressPage() {
                             style={{ width: `${t.mastery_score}%` }}
                           />
                         </div>
-                        <p className="mt-1 text-[11px] text-gray-400">
+                        <p className="mt-1 text-[11px] text-ink-3">
                           {t.correct_attempts}/{t.total_attempts} correct
                         </p>
                       </Link>

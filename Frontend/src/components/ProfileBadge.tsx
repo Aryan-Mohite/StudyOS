@@ -51,7 +51,7 @@ export function ProfileBadge() {
   return (
     <Link
       href="/profile"
-      className="relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-gray-500 transition-colors hover:bg-brand-50 hover:text-brand-600"
+      className="relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-ink-2 transition-colors hover:bg-brand-50 dark:hover:bg-brand-500/10 hover:text-brand-600"
     >
       <span className="relative">
         <UserCircle size={16} />

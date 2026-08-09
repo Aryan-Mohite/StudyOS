@@ -15,13 +15,13 @@ export function Footer() {
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500">
             <Brain size={14} className="text-white" />
           </div>
-          <span className="font-display text-sm font-bold text-gray-900">StudyOS</span>
+          <span className="font-display text-sm font-bold text-ink">StudyOS</span>
         </Link>
-        <p className="text-xs text-gray-400">© 2025 StudyOS · Built for Indian engineering students</p>
+        <p className="text-xs text-ink-3">© 2025 StudyOS · Built for Indian engineering students</p>
         <nav className="flex gap-4">
           {links.map((l) => (
             <Link key={l.label} href={l.href}
-              className="text-xs text-gray-400 transition-colors hover:text-brand-600">
+              className="text-xs text-ink-3 transition-colors hover:text-brand-600">
               {l.label}
             </Link>
           ))}

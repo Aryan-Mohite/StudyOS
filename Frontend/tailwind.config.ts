@@ -8,6 +8,14 @@ const config: Config = {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
+    screens: {
+      xs: "420px",
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+      xl: "1280px",
+      "2xl": "1536px",
+    },
     extend: {
       colors: {
         brand: {
@@ -23,9 +31,15 @@ const config: Config = {
           800: "#1E2282",
           900: "#131660",
         },
-        surface: "#FFFFFF",
-        page:    "#F3F4FB",
-        border:  "#DDE0F2",
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        page:    "rgb(var(--color-page) / <alpha-value>)",
+        muted:   "rgb(var(--color-muted) / <alpha-value>)",
+        border:  "rgb(var(--color-border) / <alpha-value>)",
+        ink: {
+          DEFAULT: "rgb(var(--color-ink) / <alpha-value>)",
+          2: "rgb(var(--color-ink-2) / <alpha-value>)",
+          3: "rgb(var(--color-ink-3) / <alpha-value>)",
+        },
       },
       fontFamily: {
         sans:    ["var(--font-inter)", "system-ui", "sans-serif"],

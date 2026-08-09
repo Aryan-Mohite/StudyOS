@@ -27,13 +27,13 @@ export function Hero() {
 
           <motion.h1
             {...fadeUp(0.1)}
-            className="font-display text-[46px] font-bold leading-[1.12] tracking-tight text-gray-900"
+            className="font-display text-[46px] font-bold leading-[1.12] tracking-tight text-ink"
           >
             Your syllabus.<br />
             <span className="text-brand-500">Your OS for studying.</span>
           </motion.h1>
 
-          <motion.p {...fadeUp(0.2)} className="mt-5 max-w-md text-[17px] leading-relaxed text-gray-500">
+          <motion.p {...fadeUp(0.2)} className="mt-5 max-w-md text-[17px] leading-relaxed text-ink-2">
             Upload any university syllabus and instantly get structured notes,
             video picks, and MCQs — all scoped to your exact curriculum.
           </motion.p>
@@ -60,7 +60,7 @@ export function Hero() {
             ].map((s) => (
               <div key={s.n} className="flex items-baseline gap-1.5">
                 <span className="font-display text-xl font-bold text-brand-500">{s.n}</span>
-                <span className="text-sm text-gray-400">{s.l}</span>
+                <span className="text-sm text-ink-3">{s.l}</span>
               </div>
             ))}
           </motion.div>

@@ -56,7 +56,7 @@ export default function StudyPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
         <Loader2 size={20} className="animate-spin text-brand-500" />
-        <p className="text-sm text-gray-400">Loading your syllabus…</p>
+        <p className="text-sm text-ink-3">Loading your syllabus…</p>
       </div>
     );
   }
@@ -66,7 +66,7 @@ export default function StudyPage() {
   if (!resolved) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <p className="text-lg font-medium text-gray-700">Topic not found</p>
+        <p className="text-lg font-medium text-ink">Topic not found</p>
         <Link href="/dashboard" className="text-sm text-brand-500 hover:underline">
           ← Back to dashboard
         </Link>
@@ -82,7 +82,7 @@ export default function StudyPage() {
       <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-border bg-surface p-3 lg:block">
         <Link
           href="/dashboard"
-          className="mb-3 flex items-center gap-1.5 text-[12px] text-gray-400 hover:text-brand-600 transition-colors"
+          className="mb-3 flex items-center gap-1.5 text-[12px] text-ink-3 hover:text-brand-600 transition-colors"
         >
           <ChevronLeft size={13} /> Dashboard
         </Link>
@@ -93,10 +93,10 @@ export default function StudyPage() {
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Topic breadcrumb */}
         <div className="shrink-0 border-b border-border bg-surface px-5 py-3">
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-ink-3">
             {topic.subject} · {topic.unit_title}
           </p>
-          <h1 className="font-display text-[16px] font-bold text-gray-900 leading-snug">
+          <h1 className="font-display text-[16px] font-bold text-ink leading-snug">
             {topic.name}
           </h1>
         </div>
@@ -111,7 +111,7 @@ export default function StudyPage() {
                 className={`flex items-center gap-1.5 border-b-2 px-5 py-3 text-[13px] font-medium transition-colors ${
                   activeTab === id
                     ? "border-brand-500 text-brand-600"
-                    : "border-transparent text-gray-500 hover:text-gray-800"
+                    : "border-transparent text-ink-2 hover:text-ink"
                 }`}
               >
                 <Icon size={13} />
@@ -123,7 +123,7 @@ export default function StudyPage() {
           <div className="flex items-center gap-1 pr-3 lg:hidden">
             <button
               onClick={() => setMobileSyllabusOpen(true)}
-              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-gray-500 hover:bg-page hover:text-brand-600 transition-colors"
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[12px] font-medium text-ink-2 hover:bg-page hover:text-brand-600 transition-colors"
               aria-label="Open syllabus"
             >
               <List size={14} />
@@ -164,10 +164,10 @@ export default function StudyPage() {
           />
           <div className="relative ml-auto flex h-full w-[85%] max-w-sm flex-col bg-surface shadow-xl">
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-              <span className="text-[13px] font-semibold text-gray-900">Syllabus</span>
+              <span className="text-[13px] font-semibold text-ink">Syllabus</span>
               <button
                 onClick={() => setMobileSyllabusOpen(false)}
-                className="rounded p-1 text-gray-400 hover:text-brand-500 transition-colors"
+                className="rounded p-1 text-ink-3 hover:text-brand-500 transition-colors"
                 aria-label="Close"
               >
                 <X size={16} />

@@ -17,10 +17,10 @@ export function CTA() {
         <span className="font-display text-[13px] font-semibold uppercase tracking-[0.14em] text-brand-500">
           Unit 01 of your syllabus
         </span>
-        <h2 className="mt-3 font-display text-[34px] font-bold tracking-tight text-gray-900">
+        <h2 className="mt-3 font-display text-[34px] font-bold tracking-tight text-ink">
           Start with your syllabus.
         </h2>
-        <p className="mx-auto mt-4 max-w-sm text-[16px] leading-relaxed text-gray-500">
+        <p className="mx-auto mt-4 max-w-sm text-[16px] leading-relaxed text-ink-2">
           Go from &quot;I don&apos;t know where to start&quot; to a full study plan in minutes.
         </p>
         <Button asChild size="lg" className="mt-8">
@@ -28,7 +28,7 @@ export function CTA() {
             <Upload size={16} /> Upload syllabus — it&apos;s free
           </Link>
         </Button>
-        <p className="mt-4 text-[13px] text-gray-400">
+        <p className="mt-4 text-[13px] text-ink-3">
           No credit card · Works for any Indian university
         </p>
       </motion.div>

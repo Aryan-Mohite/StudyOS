@@ -25,7 +25,7 @@ export function Mockup() {
             <div key={c} style={{ background: c }} className="h-2 w-2 rounded-full" />
           ))}
         </div>
-        <div className="flex-1 rounded-md border border-border bg-surface px-3 py-1 text-[11px] text-gray-400">
+        <div className="flex-1 rounded-md border border-border bg-surface px-3 py-1 text-[11px] text-ink-3">
           StudyOS · SPPU CSE Sem 3 · Data Structures
         </div>
       </div>
@@ -33,18 +33,18 @@ export function Mockup() {
       <div className="flex h-[320px]">
         {/* Sidebar */}
         <div className="flex w-40 flex-col gap-1 border-r border-border p-3">
-          <p className="mb-1 px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">Sources</p>
+          <p className="mb-1 px-1 text-[9px] font-bold uppercase tracking-widest text-ink-3">Sources</p>
           {sources.map((s) => (
             <div key={s.label} className="flex items-center gap-2 rounded-lg border border-border bg-page p-1.5">
               <div style={{ background: `${s.color}18` }} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md">
                 <s.icon size={10} style={{ color: s.color }} />
               </div>
-              <span className="text-[10px] leading-tight text-gray-700">{s.label}</span>
+              <span className="text-[10px] leading-tight text-ink">{s.label}</span>
             </div>
           ))}
 
           <div className="my-2 h-px bg-border" />
-          <p className="mb-1 px-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">Topics</p>
+          <p className="mb-1 px-1 text-[9px] font-bold uppercase tracking-widest text-ink-3">Topics</p>
           {topics.map((t) => (
             <div key={t.name} className="flex cursor-pointer items-center gap-1.5 rounded-md px-1 py-0.5">
               <div style={{ background: t.done ? "#4650E0" : "#DDE0F2" }}
@@ -62,19 +62,19 @@ export function Mockup() {
             {tabs.map((t, i) => (
               <div key={t}
                 style={i === 0 ? { background: "#4650E0", color: "white", borderColor: "#4650E0" } : {}}
-                className="cursor-pointer rounded-full border border-border px-2.5 py-0.5 text-[10px] font-semibold text-gray-400">
+                className="cursor-pointer rounded-full border border-border px-2.5 py-0.5 text-[10px] font-semibold text-ink-3">
                 {t}
               </div>
             ))}
           </div>
 
           <div className="flex flex-1 flex-col gap-2 overflow-hidden">
-            <span className="text-[12px] font-bold text-gray-900">AVL Trees — Unit 2</span>
+            <span className="text-[12px] font-bold text-ink">AVL Trees — Unit 2</span>
             {[92, 78, 85, 60].map((w) => (
               <div key={w} style={{ width: `${w}%` }} className="h-1.5 rounded-full bg-border" />
             ))}
             <div className="my-1 h-px bg-border" />
-            <div className="rounded-lg border bg-brand-50 border-brand-200 p-2 flex flex-col gap-1">
+            <div className="rounded-lg border bg-brand-50 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/30 p-2 flex flex-col gap-1">
               <div className="h-1.5 w-[88%] rounded-full bg-brand-200" />
               <div className="h-1.5 w-[65%] rounded-full bg-brand-200" />
             </div>
@@ -82,8 +82,8 @@ export function Mockup() {
 
           {/* Chat strip */}
           <div className="flex items-center gap-2 rounded-lg border border-border bg-page px-2.5 py-1.5">
-            <MessageSquare size={12} className="text-gray-400 shrink-0" />
-            <span className="flex-1 text-[10px] text-gray-400">Ask about AVL rotations…</span>
+            <MessageSquare size={12} className="text-ink-3 shrink-0" />
+            <span className="flex-1 text-[10px] text-ink-3">Ask about AVL rotations…</span>
             <div className="flex h-5 w-5 items-center justify-center rounded-md bg-brand-500">
               <ArrowRight size={10} className="text-white" />
             </div>

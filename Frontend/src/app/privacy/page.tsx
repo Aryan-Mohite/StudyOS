@@ -10,13 +10,13 @@ export default function PrivacyPage() {
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-500">
           <Brain size={14} className="text-white" />
         </div>
-        <span className="font-display text-sm font-bold text-gray-900">StudyOS</span>
+        <span className="font-display text-sm font-bold text-ink">StudyOS</span>
       </Link>
 
-      <h1 className="font-display text-2xl font-bold text-gray-900">Privacy Policy</h1>
-      <p className="mt-2 text-sm text-gray-400">Last updated {new Date().getFullYear()}</p>
+      <h1 className="font-display text-2xl font-bold text-ink">Privacy Policy</h1>
+      <p className="mt-2 text-sm text-ink-3">Last updated {new Date().getFullYear()}</p>
 
-      <div className="mt-8 space-y-6 text-sm leading-relaxed text-gray-600">
+      <div className="mt-8 space-y-6 text-sm leading-relaxed text-ink-2">
         <p>
           StudyOS collects only what it needs to generate study materials from your
           syllabus: your account details from Clerk (name, email), the syllabus PDFs
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           You can request deletion of your account and associated data at any time by
           contacting us — see the Contact page.
         </p>
-        <p className="text-gray-400">
+        <p className="text-ink-3">
           This is a placeholder policy for the StudyOS project and should be replaced
           with a reviewed legal document before production use.
         </p>
