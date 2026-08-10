@@ -94,7 +94,7 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
       if (difficultyChanged) {
         // Same belt-and-suspenders pattern as handleRegenerate: clear the
         // cached row before asking for a fresh one at the new difficulty.
-        try { await deleteMCQ(topicId); } catch { /* ignore if not cached */ }
+        if (syllabusId) { try { await deleteMCQ(topicId, syllabusId); } catch { /* ignore if not cached */ } }
       }
 
       const result = await generateMCQ({
@@ -128,7 +128,7 @@ export function MCQQuiz({ topicId, topicName, subject, syllabusContext = [], syl
 
   const handleRegenerate = async () => {
     // Delete cache first so a stale syllabus produces genuinely new questions
-    try { await deleteMCQ(topicId); } catch { /* ignore if not cached */ }
+    if (syllabusId) { try { await deleteMCQ(topicId, syllabusId); } catch { /* ignore if not cached */ } }
     await generate(true);
   };
 

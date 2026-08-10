@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPool, initDb } from "@/lib/db";
+import { getPool, initDb, syllabusBelongsToUser } from "@/lib/db";
 import { getStudentContext } from "@/lib/profile";
 import { generateMCQ as callAgenticMCQ, AgenticError } from "@/lib/agentic";
 import { withApiHandler, ApiContext } from "@/lib/apiHandler";
@@ -22,15 +22,24 @@ export const POST = withApiHandler(
     }
     const { topic_id, topic_name, subject, count, difficulty, syllabus_context, syllabus_id, force_regenerate } = body;
 
+    // BUG FIX (see CHANGES-BUGFIXES.md): syllabus_id is client-supplied and
+    // feeds AgenticService's RAG grounding — a caller could previously pass
+    // *any* syllabus_id here and have MCQs generated grounded in another
+    // student's uploaded reference material. Verify ownership before using
+    // it for anything, same as every other route that accepts a syllabus_id.
+    if (syllabus_id && !(await syllabusBelongsToUser(syllabus_id, ctx.userId as string))) {
+      return NextResponse.json({ detail: "Syllabus not found." }, { status: 404 });
+    }
+
     const pool = getPool();
 
     // ── Cache check ──────────────────────────────────────────────────────────
     if (!force_regenerate) {
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT content_json FROM mcq_sets
-         WHERE topic_id = ?
+         WHERE topic_id = ? AND syllabus_id = ?
          ORDER BY created_at DESC LIMIT 1`,
-        [topic_id],
+        [topic_id, syllabus_id],
       );
       const row = rows[0];
       if (row) {

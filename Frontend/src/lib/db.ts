@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS syllabi (
   raw_text     LONGTEXT,
   parsed_json  LONGTEXT NOT NULL,
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_syllabi_user (user_id)
+  INDEX idx_syllabi_user_created (user_id, created_at)
 );
 
 CREATE TABLE IF NOT EXISTS notes (
@@ -293,6 +293,33 @@ async function migrateSchema(pool: mysql.Pool): Promise<void> {
   // in this same process tries to use it.
   await pool.query(CREATE_DAILY_GOALS);
   await pool.query(CREATE_WEEKLY_GOALS);
+
+  // PERF FIX (see CHANGES-BUGFIXES.md): every dashboard page load runs
+  // `SELECT ... FROM syllabi WHERE user_id = ? ORDER BY created_at DESC
+  // LIMIT 1` (fetchLatestSyllabus) — the hottest read in the app. The
+  // original single-column index on user_id only narrows the row set;
+  // MySQL still needs a filesort to satisfy `ORDER BY created_at DESC`.
+  // A composite (user_id, created_at) index lets it walk the index in
+  // order and stop at the first row — no sort, no extra I/O. Installs
+  // created before this fix still have the old single-column index (a
+  // fresh `CREATE TABLE IF NOT EXISTS` above won't touch an existing
+  // table's indexes), so add the composite one here if it's missing.
+  const [syllabiIndexRows] = await pool.query<mysql.RowDataPacket[]>(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'syllabi' AND INDEX_NAME = 'idx_syllabi_user_created'`,
+    [dbName],
+  );
+  if (syllabiIndexRows.length === 0) {
+    await pool.query(`ALTER TABLE syllabi ADD INDEX idx_syllabi_user_created (user_id, created_at)`);
+    // The old single-column index is now redundant (any query that could
+    // use it can use the composite index's leading column instead) —
+    // drop it if present so writes don't pay for maintaining two indexes.
+    try {
+      await pool.query(`ALTER TABLE syllabi DROP INDEX idx_syllabi_user`);
+    } catch {
+      /* already absent on installs that only ever had the old name — ignore */
+    }
+  }
 }
 
 /**
@@ -354,70 +381,98 @@ export interface AttemptRollup {
  * this write volume (one row per answered question), consistent with the
  * project's lean-infra stance (no queue/worker for this).
  */
+/**
+ * BUG FIX + PERF (see CHANGES-BUGFIXES.md): this used to run five separate
+ * `pool.query()` calls — each one checking out and returning its own
+ * connection from the pool — with no transaction around them. Two problems:
+ *   1. Correctness: if the process crashed or the connection dropped between
+ *      any two of these writes (e.g. after recording the attempt but before
+ *      updating topic_mastery), the rollup tables would permanently
+ *      disagree with the attempts table, with nothing to reconcile them.
+ *   2. Perf: this runs on every single MCQ answer — the hottest write path
+ *      in the app — so 5x pool checkouts per attempt adds up fast under
+ *      concurrent load (each checkout has real overhead: pool bookkeeping +
+ *      a TCP round trip if the pool is momentarily exhausted).
+ * Now: one connection, one transaction, all 5 statements on it, single
+ * checkout/release. Rolls back cleanly on any failure instead of leaving
+ * partial writes.
+ */
 export async function recordAttempt(input: RecordAttemptInput): Promise<AttemptRollup> {
   await initDb();
   const pool = getPool();
   const { userId, syllabusId, topicId, topicName, subject, contentType, difficulty, isCorrect } = input;
   const correctInt = isCorrect ? 1 : 0;
 
-  await pool.query(
-    `INSERT INTO attempts (user_id, syllabus_id, topic_id, topic_name, subject, content_type, difficulty, is_correct)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, syllabusId, topicId, topicName, subject, contentType, difficulty, correctInt],
-  );
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  await pool.query(
-    `INSERT INTO topic_mastery (user_id, topic_id, topic_name, subject, syllabus_id, total_attempts, correct_attempts, mastery_score, last_attempted_at)
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, NOW())
-     ON DUPLICATE KEY UPDATE
-       total_attempts = total_attempts + 1,
-       correct_attempts = correct_attempts + VALUES(correct_attempts),
-       mastery_score = ROUND(100 * (correct_attempts + VALUES(correct_attempts)) / (total_attempts + 1), 2),
-       last_attempted_at = NOW()`,
-    [userId, topicId, topicName, subject, syllabusId, correctInt, isCorrect ? 100 : 0],
-  );
+    await conn.query(
+      `INSERT INTO attempts (user_id, syllabus_id, topic_id, topic_name, subject, content_type, difficulty, is_correct)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, syllabusId, topicId, topicName, subject, contentType, difficulty, correctInt],
+    );
 
-  const [masteryRows] = await pool.query(
-    `SELECT mastery_score, total_attempts, correct_attempts FROM topic_mastery WHERE user_id = ? AND topic_id = ?`,
-    [userId, topicId],
-  );
-  const mastery = (masteryRows as Array<{ mastery_score: string; total_attempts: number; correct_attempts: number }>)[0];
+    await conn.query(
+      `INSERT INTO topic_mastery (user_id, topic_id, topic_name, subject, syllabus_id, total_attempts, correct_attempts, mastery_score, last_attempted_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         total_attempts = total_attempts + 1,
+         correct_attempts = correct_attempts + VALUES(correct_attempts),
+         mastery_score = ROUND(100 * (correct_attempts + VALUES(correct_attempts)) / (total_attempts + 1), 2),
+         last_attempted_at = NOW()`,
+      [userId, topicId, topicName, subject, syllabusId, correctInt, isCorrect ? 100 : 0],
+    );
 
-  // Simplified SM-2-style spacing: correct doubles the interval (capped),
-  // incorrect resets it to 1 day so the topic resurfaces almost immediately.
-  const [revRows] = await pool.query(
-    `SELECT interval_days FROM revision_schedule WHERE user_id = ? AND topic_id = ?`,
-    [userId, topicId],
-  );
-  const prevInterval = (revRows as Array<{ interval_days: number }>)[0]?.interval_days ?? 0;
-  const nextInterval = isCorrect ? Math.min(prevInterval > 0 ? prevInterval * 2 : 2, 30) : 1;
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + nextInterval);
-  const nextReviewStr = nextReviewDate.toISOString().slice(0, 10);
+    const [masteryRows] = await conn.query(
+      `SELECT mastery_score, total_attempts, correct_attempts FROM topic_mastery WHERE user_id = ? AND topic_id = ?`,
+      [userId, topicId],
+    );
+    const mastery = (masteryRows as Array<{ mastery_score: string; total_attempts: number; correct_attempts: number }>)[0];
 
-  await pool.query(
-    `INSERT INTO revision_schedule (user_id, topic_id, topic_name, subject, syllabus_id, interval_days, next_review_date, last_reviewed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-     ON DUPLICATE KEY UPDATE
-       interval_days = VALUES(interval_days),
-       next_review_date = VALUES(next_review_date),
-       last_reviewed_at = NOW()`,
-    [userId, topicId, topicName, subject, syllabusId, nextInterval, nextReviewStr],
-  );
+    // Simplified SM-2-style spacing: correct doubles the interval (capped),
+    // incorrect resets it to 1 day so the topic resurfaces almost immediately.
+    const [revRows] = await conn.query(
+      `SELECT interval_days FROM revision_schedule WHERE user_id = ? AND topic_id = ?`,
+      [userId, topicId],
+    );
+    const prevInterval = (revRows as Array<{ interval_days: number }>)[0]?.interval_days ?? 0;
+    const nextInterval = isCorrect ? Math.min(prevInterval > 0 ? prevInterval * 2 : 2, 30) : 1;
+    const nextReviewDate = new Date();
+    nextReviewDate.setDate(nextReviewDate.getDate() + nextInterval);
+    const nextReviewStr = nextReviewDate.toISOString().slice(0, 10);
 
-  await pool.query(
-    `INSERT INTO daily_goals (user_id, syllabus_id, goal_date, completed_questions)
-     VALUES (?, ?, ?, 1)
-     ON DUPLICATE KEY UPDATE completed_questions = completed_questions + 1`,
-    [userId, syllabusId, todayStr()],
-  );
+    await conn.query(
+      `INSERT INTO revision_schedule (user_id, topic_id, topic_name, subject, syllabus_id, interval_days, next_review_date, last_reviewed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE
+         interval_days = VALUES(interval_days),
+         next_review_date = VALUES(next_review_date),
+         last_reviewed_at = NOW()`,
+      [userId, topicId, topicName, subject, syllabusId, nextInterval, nextReviewStr],
+    );
 
-  return {
-    mastery_score: Number(mastery?.mastery_score ?? (isCorrect ? 100 : 0)),
-    total_attempts: mastery?.total_attempts ?? 1,
-    correct_attempts: mastery?.correct_attempts ?? correctInt,
-    next_review_date: nextReviewStr,
-  };
+    await conn.query(
+      `INSERT INTO daily_goals (user_id, syllabus_id, goal_date, completed_questions)
+       VALUES (?, ?, ?, 1)
+       ON DUPLICATE KEY UPDATE completed_questions = completed_questions + 1`,
+      [userId, syllabusId, todayStr()],
+    );
+
+    await conn.commit();
+
+    return {
+      mastery_score: Number(mastery?.mastery_score ?? (isCorrect ? 100 : 0)),
+      total_attempts: mastery?.total_attempts ?? 1,
+      correct_attempts: mastery?.correct_attempts ?? correctInt,
+      next_review_date: nextReviewStr,
+    };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 /** Difficulty suggestion derived from a student's own accuracy on a topic — never overrides their manual choice. */

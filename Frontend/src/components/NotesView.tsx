@@ -85,7 +85,7 @@ export function NotesView({
 
   const handleRegenerate = async () => {
     // Delete cache first, then regenerate
-    try { await deleteNotes(topicId); } catch { /* ignore if not cached */ }
+    if (syllabusId) { try { await deleteNotes(topicId, syllabusId); } catch { /* ignore if not cached */ } }
     await generate(true);
   };
 

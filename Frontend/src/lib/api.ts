@@ -91,12 +91,12 @@ export async function generateNotes(input: GenerateNotesInput): Promise<Note & {
   });
 }
 
-export async function getNotes(topicId: string): Promise<Note> {
-  return request<Note>(`/api/notes/${topicId}`);
+export async function getNotes(topicId: string, syllabusId: string): Promise<Note> {
+  return request<Note>(`/api/notes/${topicId}?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
-export async function deleteNotes(topicId: string): Promise<void> {
-  await request<void>(`/api/notes/${topicId}`, { method: "DELETE" });
+export async function deleteNotes(topicId: string, syllabusId: string): Promise<void> {
+  await request<void>(`/api/notes/${topicId}?syllabus_id=${encodeURIComponent(syllabusId)}`, { method: "DELETE" });
 }
 
 // ─── MCQ ───────────────────────────────────────────────────────────────────────
@@ -119,12 +119,12 @@ export async function generateMCQ(input: GenerateMCQInput): Promise<MCQSet & { _
   });
 }
 
-export async function getMCQ(topicId: string): Promise<MCQSet> {
-  return request<MCQSet>(`/api/mcq/${topicId}`);
+export async function getMCQ(topicId: string, syllabusId: string): Promise<MCQSet> {
+  return request<MCQSet>(`/api/mcq/${topicId}?syllabus_id=${encodeURIComponent(syllabusId)}`);
 }
 
-export async function deleteMCQ(topicId: string): Promise<void> {
-  await request<void>(`/api/mcq/${topicId}`, { method: "DELETE" });
+export async function deleteMCQ(topicId: string, syllabusId: string): Promise<void> {
+  await request<void>(`/api/mcq/${topicId}?syllabus_id=${encodeURIComponent(syllabusId)}`, { method: "DELETE" });
 }
 
 // ─── Health ───────────────────────────────────────────────────────────────────
