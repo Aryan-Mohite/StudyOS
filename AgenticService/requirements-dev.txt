@@ -3,13 +3,24 @@
 # Deliberately NOT merged into requirements.txt: these are dev/CI-only.
 # Runtime requirements.txt stays exactly as-is for deploys.
 #
-# Note: pytest/httpx here are enough to run the full test suite because
-# tests/conftest.py stubs out App.workflows.* before main.py is imported,
-# so the langchain/langgraph/sentence-transformers/torch chain in
-# requirements.txt never actually gets imported during tests. If you add a
-# test that imports a real workflow module (rather than mocking it), you'll
-# need the full requirements.txt installed too.
+# Note: this stays enough to run the full test suite WITHOUT installing the
+# full requirements.txt (langchain-groq/gemini/anthropic, sentence-transformers,
+# torch, qdrant-client, ...):
+#   - tests/conftest.py stubs out App.workflows.* in sys.modules before
+#     main.py is imported, so main.py's own imports never pull in the real
+#     workflow chain.
+#   - App.agents.{mcq,notes,study_plan}_agent.py import
+#     App.services.llm_service, which only needs langchain-core at import
+#     time (the actual provider SDKs — langchain_groq etc. — are imported
+#     lazily inside _build_llm(), not at module load). langchain-core alone
+#     is enough to import the agent modules and exercise their pure
+#     validate_*_quality()/repair_*() functions without ever calling a real
+#     LLM.
+# If you add a test that actually calls call_llm_json / _build_llm end to
+# end (rather than testing the pure validation functions), you'll need the
+# full requirements.txt installed too.
 
 pytest>=8.0.0
 pytest-asyncio>=0.24.0
 httpx>=0.27.0
+langchain-core>=0.3.0

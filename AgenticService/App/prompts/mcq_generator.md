@@ -44,7 +44,7 @@ Return exactly this structure:
 - Exactly one option must be unambiguously correct — no "more than one could be argued" situations
 - Keep option length roughly balanced (don't make the correct answer noticeably longer/more detailed than distractors — that's a giveaway)
 
-**correct:** Must be one of "A", "B", "C", "D" and must match the actually-correct option.
+**correct:** Must be one of "A", "B", "C", "D" and must match the actually-correct option. Vary the position of the correct answer across the set — do not cluster it in one letter (e.g. don't make "C" correct 6 times out of 10). Randomize as if you were placing the correct option independently for each question.
 
 **explanation:**
 - State clearly why the correct answer is right (cite the rule/formula/definition)

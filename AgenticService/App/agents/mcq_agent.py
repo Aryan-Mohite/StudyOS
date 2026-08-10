@@ -170,6 +170,26 @@ def validate_mcq_quality(mcq_set: dict, requested_difficulty: str) -> list[str]:
         if stem and expl and stem == expl:
             issues.append(f"question id {q.get('id')} explanation just repeats the stem")
 
+    # AI RESPONSE IMPROVEMENT (see CHANGES-AI-QUALITY.md): correct-answer
+    # positional bias. LLMs generating MCQ sets have a well-documented
+    # tendency to cluster the correct answer in one option slot (commonly
+    # "C" or "B") rather than distributing it roughly evenly across A/B/C/D.
+    # A student who notices "the correct answer is C more often than not"
+    # can game the quiz without knowing the material — this defeats the
+    # feature's purpose. Flag when one option holds more than half the
+    # correct answers in a set large enough for the skew to be meaningful.
+    MIN_QUESTIONS_FOR_BIAS_CHECK = 6
+    if len(questions) >= MIN_QUESTIONS_FOR_BIAS_CHECK:
+        positions = [q.get("correct") for q in questions if q.get("correct") in ("A", "B", "C", "D")]
+        if positions:
+            counts = {opt: positions.count(opt) for opt in ("A", "B", "C", "D")}
+            top_option, top_count = max(counts.items(), key=lambda kv: kv[1])
+            if top_count / len(positions) > 0.5:
+                issues.append(
+                    f"correct-answer position is skewed toward '{top_option}' "
+                    f"({top_count}/{len(positions)} questions — distribution: {counts})"
+                )
+
     return issues
 
 
