@@ -1,0 +1,15 @@
+# AgenticService — test dependencies
+#
+# Deliberately NOT merged into requirements.txt: these are dev/CI-only.
+# Runtime requirements.txt stays exactly as-is for deploys.
+#
+# Note: pytest/httpx here are enough to run the full test suite because
+# tests/conftest.py stubs out App.workflows.* before main.py is imported,
+# so the langchain/langgraph/sentence-transformers/torch chain in
+# requirements.txt never actually gets imported during tests. If you add a
+# test that imports a real workflow module (rather than mocking it), you'll
+# need the full requirements.txt installed too.
+
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+httpx>=0.27.0
