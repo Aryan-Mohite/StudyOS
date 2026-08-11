@@ -37,7 +37,12 @@ class Settings(BaseSettings):
     qdrant_url: str = ""
     qdrant_api_key: str = ""
     qdrant_local_path: str = "vector_db"
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # Embeddings run via the Gemini API (not locally) to avoid the torch/
+    # sentence-transformers memory footprint that OOMs on Render's free
+    # 512MB tier — see rag_service.py's module docstring. This means
+    # gemini_api_key below is required for RAG even when LLM_PROVIDER is
+    # "groq" or "anthropic".
+    embedding_model: str = "models/gemini-embedding-001"
 
     # ── Security ─────────────────────────────────────────────────────────
     # Shared secret for verifying the service-to-service JWT that Next.js
@@ -72,6 +77,21 @@ class Settings(BaseSettings):
             )
         if self.env == "production" and not self.internal_service_jwt_secret:
             _fail("INTERNAL_SERVICE_JWT_SECRET must be set in production — refusing to start unauthenticated.")
+        if not self.gemini_api_key:
+            # Not a hard fail: reference-material RAG is an optional feature
+            # (notes/MCQ generation work fine without it), so a missing key
+            # shouldn't block the whole service from starting. But it will
+            # make every RAG call fail at request time, so surface it loudly
+            # now rather than as a mystery 500 the first time a student
+            # uploads a reference PDF.
+            print(
+                "[config] WARNING: GEMINI_API_KEY is not set. Reference-material "
+                "RAG (embeddings) requires it regardless of LLM_PROVIDER — "
+                "notes/MCQ generation will still work, but reference uploads "
+                "and grounded generation will fail until it's set. Get a free "
+                "key (no credit card) at https://aistudio.google.com/apikey.",
+                file=sys.stderr,
+            )
         if self.env == "production" and not self.qdrant_url:
             # Deliberately a warning, not _fail(): local-path Qdrant still
             # works, it just won't survive a restart on ephemeral-disk hosts.

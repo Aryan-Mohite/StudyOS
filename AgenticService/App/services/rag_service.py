@@ -4,8 +4,15 @@ rag_service.py — Vector store over student-uploaded reference material
 Notes and MCQ generation in real source material instead of trained LLM
 knowledge alone.
 
-Embeddings run locally via sentence-transformers (no extra paid API,
-consistent with "lean infra until justified").
+Embeddings run via the Gemini Embedding API (gemini-embedding-001), not
+locally. This is a deliberate change from the original sentence-transformers
+approach: sentence-transformers pulls in torch, which needs 400-600MB RAM
+once the model is loaded — more than Render's free-tier 512MB cap, and it
+was OOM-crashing the service on startup before a single request landed.
+Gemini's free tier (1,500 requests/day, no credit card) has no such memory
+cost since embedding happens on Google's infrastructure, not this process.
+This means GEMINI_API_KEY is now required for RAG regardless of which
+LLM_PROVIDER generates notes/MCQs — see config.py's validation.
 
 Vector storage backend: Qdrant.
   - QDRANT_URL set (Qdrant Cloud free tier, or any self-hosted Qdrant) ->
@@ -20,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from langchain_qdrant import QdrantVectorStore
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient
@@ -29,19 +36,25 @@ from qdrant_client.http.exceptions import UnexpectedResponse
 
 from config import settings
 
-# all-MiniLM-L6-v2 (the default embedding_model) produces 384-dim vectors.
-# If you change EMBEDDING_MODEL, update this to match, or collection
-# creation below will silently store the wrong dimensionality.
-_EMBEDDING_DIM = 384
+# gemini-embedding-001 supports configurable output dimensionality; we pin
+# it to 768 explicitly (matches the old MiniLM dimension) so collection
+# creation below is deterministic. If you change EMBEDDING_DIM, you must
+# also change output_dimensionality in _get_embeddings() to match, or
+# collection creation will silently store the wrong dimensionality.
+_EMBEDDING_DIM = 768
 
-_embeddings: Optional[HuggingFaceEmbeddings] = None
+_embeddings: Optional[GoogleGenerativeAIEmbeddings] = None
 _client: Optional[QdrantClient] = None
 
 
-def _get_embeddings() -> HuggingFaceEmbeddings:
+def _get_embeddings() -> GoogleGenerativeAIEmbeddings:
     global _embeddings
     if _embeddings is None:
-        _embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model)
+        _embeddings = GoogleGenerativeAIEmbeddings(
+            model=settings.embedding_model,
+            google_api_key=settings.gemini_api_key,
+            output_dimensionality=_EMBEDDING_DIM,
+        )
     return _embeddings
 
 

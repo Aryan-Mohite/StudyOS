@@ -51,14 +51,19 @@ created automatically per syllabus on first upload; no manual setup needed.
    root automatically and propose the `studyos-agentic` service.
 3. Render will prompt for the env vars marked `sync: false` in
    `render.yaml`. Fill in:
-   - `GROQ_API_KEY` (or `GEMINI_API_KEY`/`ANTHROPIC_API_KEY`, matching
-     whatever `LLM_PROVIDER` you use — Groq is the default)
+   - `GROQ_API_KEY` (or `ANTHROPIC_API_KEY`, matching whatever
+     `LLM_PROVIDER` you use for text generation — Groq is the default)
+   - `GEMINI_API_KEY` — **required regardless of `LLM_PROVIDER`.** RAG
+     embeddings always run via the free Gemini Embedding API now (see
+     "Known limitations" below for why). Get a free key, no credit card,
+     at https://aistudio.google.com/apikey.
    - `QDRANT_URL` and `QDRANT_API_KEY` from step 2
    - `INTERNAL_SERVICE_JWT_SECRET` — generate one locally with
      `openssl rand -hex 32`. **Save this value** — you need the exact same
      string in Vercel in step 4.
-4. Deploy. First build takes a few minutes (installing torch for
-   sentence-transformers is the slow part).
+4. Deploy. This is Render's native Python runtime (no Docker) — build is
+   just `pip install -r requirements.txt`, which is fast since there's no
+   torch and no OS packages to install.
 5. Once live, copy the service's URL, e.g. `https://studyos-agentic.onrender.com`.
 6. **Note the free-tier behavior:** this service spins down after 15
    minutes of no traffic and takes 30-60 seconds to wake up on the next
@@ -124,14 +129,16 @@ Be upfront with yourself about these before pointing real users at it:
 - **Cold starts.** Render's free web service spins down after 15 minutes of
   inactivity; the next request pays a 30-60s wake-up cost. Fine for a demo
   you control the timing of, bad for a stranger's first impression.
-- **Possible OOM risk.** `sentence-transformers` + `torch` typically need
-  400-600MB RAM once the embedding model is loaded. Render's free plan
-  gives you 512MB total. If you see the service crash-looping or requests
-  failing right after a syllabus/reference upload, this is the likely
-  cause. If it happens, the fix is either upgrading Render's plan or
-  swapping local embeddings for a hosted embeddings API — that's a real
-  code change, not something silently done here, since it changes the
-  RAG architecture.
+- **Resolved: the OOM risk.** This stack originally ran embeddings locally
+  via `sentence-transformers`/`torch`, which needed 400-600MB RAM once
+  loaded — over Render's free 512MB cap, and it crashed the service on
+  startup (before any request even landed). Embeddings now run via the
+  Gemini Embedding API instead (free tier, 1,500 requests/day, no card),
+  so this process no longer loads a model into memory at all. This is why
+  `GEMINI_API_KEY` is required even if `LLM_PROVIDER=groq`. Rate-limit
+  note: 1,500 embedding requests/day is generous for a study app, but if
+  you ever hit it, Render's Standard plan ($25/mo, 2GB RAM — note the $7
+  Starter plan is *also* 512MB and won't help) is the paid fallback.
 - **Free-tier suspension risk.** Render can suspend free services that
   generate unusual outbound traffic patterns. Don't build anything
   time-critical on this without a paid plan.

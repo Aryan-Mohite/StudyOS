@@ -2,8 +2,6 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 pdfplumber>=0.11.0
 pymupdf>=1.24.0
-pytesseract>=0.3.10
-pillow>=10.0.0
 pydantic>=2.7.0
 pydantic-settings>=2.3.0
 python-dotenv>=1.0.0
@@ -36,5 +34,9 @@ langchain-anthropic>=0.3.0
 # (via QDRANT_LOCAL_PATH) when QDRANT_URL isn't set.
 langchain-qdrant>=0.2.0
 qdrant-client>=1.12.0
-langchain-huggingface>=0.1.0
-sentence-transformers>=3.0.0
+
+# Embeddings run via the Gemini API (langchain-google-genai, already listed
+# above under LLM providers), not locally. sentence-transformers/torch were
+# removed here: they need 400-600MB RAM once loaded, which OOM-crashed the
+# service on Render's free 512MB tier before a single request landed. See
+# rag_service.py's module docstring for the full story.
