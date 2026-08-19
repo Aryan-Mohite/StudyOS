@@ -117,3 +117,5 @@ def _fail(message: str) -> None:
 
 
 settings = Settings()
+
+print(f"[config] embedding_model = {settings.embedding_model}", file=sys.stderr)
