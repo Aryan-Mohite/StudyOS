@@ -73,11 +73,44 @@ def get_llm(max_tokens: int = 4096, temperature: float = 0.0) -> BaseChatModel:
     return _llm_cache[key]
 
 
+def _content_to_text(content) -> str:
+    """
+    Normalize a LangChain message .content value to plain text.
+
+    Most providers (Groq, Anthropic in the common case) return a plain
+    string. Gemini (and some Anthropic tool-call responses) can return a
+    list of content blocks instead, e.g.:
+        [{"type": "text", "text": "..."}]
+    This flattens either shape into a single string so every downstream
+    consumer (extract_json, logging, etc.) can rely on getting a string.
+    """
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                # Standard shape: {"type": "text", "text": "..."}
+                if "text" in block:
+                    parts.append(block["text"])
+                else:
+                    parts.append(str(block))
+            else:
+                parts.append(str(block))
+        return "".join(parts)
+
+    # Fallback for any other unexpected shape
+    return str(content)
+
+
 def call_llm(system: str, user: str, max_tokens: int = 4096) -> str:
-    """Call Claude via LangChain and return raw text."""
+    """Call the configured LLM via LangChain and return raw text."""
     llm = get_llm(max_tokens=max_tokens)
     response = llm.invoke([SystemMessage(content=system), HumanMessage(content=user)])
-    return response.content
+    return _content_to_text(response.content)
 
 
 def extract_json(text: str) -> dict:
@@ -85,7 +118,7 @@ def extract_json(text: str) -> dict:
     Strip markdown fences or prose around a JSON object and parse it.
     Tries: direct parse → ```json fence → ``` fence → first { } block.
     """
-    text = text.strip()
+    text = _content_to_text(text).strip()
 
     try:
         return json.loads(text)
@@ -118,7 +151,7 @@ def call_llm_json(
     retries: int = 2,
 ) -> dict:
     """
-    Call Claude expecting JSON. Retries up to `retries` times on parse failure.
+    Call the LLM expecting JSON. Retries up to `retries` times on parse failure.
     Second+ attempts append a correction hint nudging the model back to raw JSON.
     """
     last_error: Optional[Exception] = None
