@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Model names per provider (override in .env if you want a different one)
     groq_model_name: str = "llama-3.3-70b-versatile"
-    gemini_model_name: str = "gemini-2.0-flash"
+    gemini_model_name: str = "gemini-3.6-flash"
     anthropic_model_name: str = "claude-sonnet-4-6"
 
     # RAG config (replaces the old "Assets" folder — persistent vector store)
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # 512MB tier — see rag_service.py's module docstring. This means
     # gemini_api_key below is required for RAG even when LLM_PROVIDER is
     # "groq" or "anthropic".
-    embedding_model: str = "models/gemini-embedding-001"
+    embedding_model: str = "gemini-embedding-001"
 
     # ── Security ─────────────────────────────────────────────────────────
     # Shared secret for verifying the service-to-service JWT that Next.js
