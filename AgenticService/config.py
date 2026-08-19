@@ -118,4 +118,8 @@ def _fail(message: str) -> None:
 
 settings = Settings()
 
-print(f"[config] embedding_model = {settings.embedding_model}", file=sys.stderr)
+settings = Settings()
+
+import sys
+print(f"[DEBUG] embedding_model = '{settings.embedding_model}'", file=sys.stderr)
+print(f"[DEBUG] gemini_api_key set = {bool(settings.gemini_api_key)}, len = {len(settings.gemini_api_key)}", file=sys.stderr)
