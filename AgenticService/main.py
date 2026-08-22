@@ -187,7 +187,8 @@ async def agent_generate_notes(request: Request, req: NotesRequest, background_t
     """Generates notes, grounded in any student-uploaded reference material for this syllabus."""
     start = time.monotonic()
     try:
-        result = run_notes_generation(
+        result = await run_in_threadpool(
+            run_notes_generation,
             topic_name=req.topic_name,
             subject=req.subject,
             unit_title=req.unit_title,
@@ -228,7 +229,8 @@ class MCQRequest(BaseModel):
 async def agent_generate_mcq(request: Request, req: MCQRequest, background_tasks: BackgroundTasks):
     start = time.monotonic()
     try:
-        result = run_mcq_generation(
+        result = await run_in_threadpool(
+            run_mcq_generation,
             topic_name=req.topic_name,
             subject=req.subject,
             topic_id=req.topic_id,
@@ -265,7 +267,8 @@ class StudyPlanRequest(BaseModel):
 async def agent_generate_study_plan(request: Request, req: StudyPlanRequest, background_tasks: BackgroundTasks):
     start = time.monotonic()
     try:
-        result = run_study_plan_generation(
+        result = await run_in_threadpool(
+            run_study_plan_generation,
             syllabus_id=req.syllabus_id,
             syllabus=req.syllabus,
             exam_date=req.exam_date,
