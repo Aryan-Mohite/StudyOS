@@ -128,7 +128,7 @@ async def agent_parse_syllabus(
         )
 
     try:
-        parsed = run_pdf_analysis(raw_text, filename or file.filename)
+        parsed = await run_in_threadpool(run_pdf_analysis, raw_text, filename or file.filename)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
