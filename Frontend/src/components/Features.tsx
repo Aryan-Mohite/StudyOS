@@ -1,14 +1,12 @@
 "use client";
 import { motion } from "framer-motion";
-import { FileText, Youtube, HelpCircle, Calendar, TrendingUp } from "lucide-react";
+import { FileText, HelpCircle, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const features = [
   { icon: FileText,   color: "#4650E0", bg: "#EEF0FF", title: "Structured Notes",      desc: "Long notes, short notes, and revision sheets — grounded in your syllabus and textbook." },
-  { icon: Youtube,    color: "#DB2777", bg: "#FDF2F8", title: "Video Picks",           desc: "Best-matched NPTEL, YouTube, and MIT OCW videos per topic." },
-  { icon: HelpCircle, color: "#D97706", bg: "#FFFBEB", title: "MCQs & Viva Qs",       desc: "Auto-generated practice questions mapped to your topic list and previous year papers." },
-  { icon: Calendar,   color: "#059669", bg: "#ECFDF5", title: "Smart Study Plans",     desc: "7-day to 60-day plans tailored to your exam date and current progress." },
-  { icon: TrendingUp, color: "#DC2626", bg: "#FEF2F2", title: "Exam Predictions",      desc: "PYQ analysis surfaces High, Medium, Low priority topics before your exam." },
+  { icon: HelpCircle, color: "#D97706", bg: "#FFFBEB", title: "MCQs & Practice",      desc: "Auto-generated practice questions mapped to your topic list, with adjustable difficulty." },
+  { icon: Calendar,   color: "#059669", bg: "#ECFDF5", title: "Smart Study Plans",     desc: "Day-by-day plans tailored to your exam date and current progress." },
 ] as const;
 
 export function Features() {
@@ -26,7 +24,7 @@ export function Features() {
           </h2>
           <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
             Upload your syllabus once. StudyOS builds a complete learning environment
-            — no manual searching across YouTube, PDFs, or question banks.
+            — no manual searching across PDFs or question banks.
           </p>
         </div>
 
